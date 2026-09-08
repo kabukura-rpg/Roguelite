@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "dev": "vinext dev",
     "build": "vinext build",
+    "build:pages": "GITHUB_PAGES=true next build --webpack && npm run verify:pages",
+    "verify:pages": "node scripts/verify-pages.mjs",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt"
@@ -45,6 +47,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
+    "next": "16.3.4",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "oxlint-tsgolint": "7.0.2001",

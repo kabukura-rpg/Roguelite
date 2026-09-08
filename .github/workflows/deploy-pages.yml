@@ -1,0 +1,78 @@
+name: Deploy game to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Verify game is a regular tracked directory
+        working-directory: .
+        shell: bash
+        run: |
+          if git ls-files --stage -- game | grep -q '^160000 '; then
+            echo '::error::game must be a regular directory, not a git submodule.'
+            exit 1
+          fi
+          git ls-files --error-unmatch game/package.json game/app/page.tsx
+          test ! -e game/.git
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: game/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test game
+        run: npm test
+
+      - name: Check types
+        run: npm run typecheck
+
+      - name: Build and verify static export
+        run: npm run build:pages
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: game/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

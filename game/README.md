@@ -21,6 +21,33 @@ npm run build
 
 ビルドは静的出力 `dist/client/` を生成します。サーバー、ログイン、実市場APIはゲーム自体には不要です。途中セーブ・永続記録は実装しません。
 
+## GitHub Pagesへの公開
+
+公開先は **https://kabukura-rpg.github.io/Roguelite/**、リポジトリは `kabukura-rpg/Roguelite` です。
+
+1. GitHubのリポジトリで **Settings → Pages → Build and deployment → Source → GitHub Actions** を選択します。
+2. この変更をリポジトリの `main` にコミット・pushします。
+3. **Actions → Deploy game to GitHub Pages** が成功すると公開されます。`Run workflow` からの手動実行にも対応します。
+
+ルートの `.github/workflows/deploy-pages.yml` が `game/` でNode.js 24、`npm ci`、ゲームテスト、型チェック、静的ビルドとアセット検証を実行し、**`game/out/`** をPagesにデプロイします。`game/` やリポジトリ全体をそのまま公開する構成ではありません。追加のトークン登録は不要で、Actionsの `GITHUB_TOKEN` とOIDCを使用します。
+
+公開用ビルドは `game/` 内で実行できます（macOS / Linux）。
+
+```sh
+npm ci
+npm run build:pages
+```
+
+ローカル開発の `npm run dev` と従来の `npm run build` は引き続きNext.js互換のvinextを使います。Pages用の `build:pages` はNext.js 16.3.4の `next build --webpack` を使い、`out/` にHTML・CSS・JavaScript・publicファイルを静的出力します。ゲームロジックとスタイルは共通です。`npm start` は従来のWorker用で、Pages出力のプレビューには使いません。
+
+`next.config.ts` の `output: 'export'`、`trailingSlash: true`、`images.unoptimized: true` によりサーバー不要で配信します。Pagesビルド時だけ `GITHUB_PAGES=true` で `basePath: '/Roguelite'` を設定します。CSS・JSはNext.jsがprefixを付与するため、別の `assetPrefix` は不要です。`public/` のfaviconには `NEXT_PUBLIC_BASE_PATH` を明示的に付けています。通常のローカル開発URLは `/` のままです。
+
+`scripts/verify-pages.mjs` はトップページ・404・`.nojekyll` の存在と、HTML・CSSから参照する同一サイト内のアセットが `/Roguelite/` 内にあり、実ファイルとして出力されていることを検査します。`npm run verify:pages` でも再実行できます。ブラウザ操作のテストではありません。
+
+`game/` は親リポジトリに通常ディレクトリとして登録されています。Gitの `160000`（gitlink）エントリ、`game/.git`、`.gitmodules` はありません。Actionsでもサブモジュールの取得を無効にし、gitlinkになっていないことと `game/package.json`・`game/app/page.tsx` の追跡を確認します。今後 `game/` 内で `git init` や `git submodule add` は行わず、親リポジトリから `git add game` で管理してください。
+
+参考: [Next.js static export](https://nextjs.org/docs/app/guides/static-exports)、[basePath](https://nextjs.org/docs/app/api-reference/config/next-config-js/basePath)、[GitHub PagesのActions設定](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
+
 ## 実装
 
 - `lib/game/data.ts`: 設定、5資産、10相場、リターン表、ランク境界
