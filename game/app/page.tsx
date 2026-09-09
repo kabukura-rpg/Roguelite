@@ -22,7 +22,7 @@ import {
   AssetRatings,
 } from '@/components/game/board';
 import { IncidentLog } from '@/components/game/incidents';
-import { publicMarketInfo, FORECAST_CONFIG } from '@/lib/game/forecast';
+import { publicMarketInfo } from '@/lib/game/forecast';
 import { INCIDENTS } from '@/lib/game/incidents';
 import { Button } from '@/components/ui/button';
 import {
@@ -813,9 +813,7 @@ export default function Home() {
             <li>
               <strong>予報を読み、先に戦略を決める</strong>
               <p>
-                市場予報は今観測できる材料です。同じ予報でも違う相場が起こります。強気・弱気・回復予報は基本
-                {Math.round(FORECAST_CONFIG.directionAccuracy * 100)}
-                %で方向性が当たりますが、具体的な相場名と騰落率は戦略確定後に抽選されます。
+                市場予報は、景気・市場心理・金利・ボラティリティの4つの観測材料です。答えではなく手がかりなので、読み方はあなた次第。同じ観測材料でも違う相場が起こりますし、予報が外れることもあります。具体的な相場名と騰落率は、戦略を確定したあとに抽選されます。
               </p>
             </li>
             <li>
@@ -833,14 +831,7 @@ export default function Home() {
             <li>
               <strong>年末の突発イベントを乗り越える</strong>
               <p>
-                通常相場の処理後、発生可能な年は30%で突発イベント。連続年には発生せず、20年完走なら最低4回、同じ出来事は一度だけです。市場ショックだけは狼狽売り・ホールド・買い増しから選び、騰落率は選択後に判明します。生活トラブルは現金優先で支払い、不足分を強制売却。日常の選択では現金・カード・次回の予報精度アップ（
-                {Math.round(FORECAST_CONFIG.directionAccuracy * 100)}%→
-                {Math.round(
-                  (FORECAST_CONFIG.directionAccuracy +
-                    FORECAST_CONFIG.insightBonus) *
-                    100,
-                )}
-                %）・次の通常相場の下落半減を得られます。任意の参加費は現金が必要です。継続効果は重複せず、最終年には次の通常相場がありません。
+                通常相場の処理後、発生可能な年は30%で突発イベント。連続年には発生せず、20年完走なら最低4回、同じ出来事は一度だけです。市場ショックだけは狼狽売り・ホールド・買い増しから選び、騰落率は選択後に判明します。生活トラブルは現金優先で支払い、不足分を強制売却。日常の選択では現金・カード・次回の予報精度アップ・次の通常相場の下落半減を得られます。任意の参加費は現金が必要です。継続効果は重複せず、最終年には次の通常相場がありません。
               </p>
             </li>
             <li>

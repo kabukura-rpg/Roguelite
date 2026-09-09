@@ -43,7 +43,7 @@ import {
   type AssetId,
   type RatingKey,
 } from '@/lib/game/data';
-import { FORECAST_PATTERNS, compareForecast } from '@/lib/game/forecast';
+import { FORECAST_PATTERNS } from '@/lib/game/forecast';
 import { CARDS, CARD_CONFIG, selectedCard } from '@/lib/game/cards';
 import { totalAssets, type State, type Action } from '@/lib/game/engine';
 import { HandPanel, StrategyCard, DeckList, StrategyOutcome } from './strategy';
@@ -224,7 +224,6 @@ function Encounter({ state: s }: { state: State }) {
           strokeWidth={1}
           aria-hidden="true"
         />
-        <h2>{pattern.name}</h2>
         <div className="forecast-observations">
           {pattern.signals.map(([label, value]) => (
             <div key={label}>
@@ -292,17 +291,14 @@ function YearResult({
       {h.forecast && (
         <div className="result-forecast-comparison">
           <span>
-            予報 · {FORECAST_PATTERNS[h.forecast.id].name}
-            {h.forecast.enhanced ? ' / 精度UP' : ''}
+            事前の市場観測{h.forecast.enhanced ? ' · 精度UP' : ''}
           </span>
           <p>
             {FORECAST_PATTERNS[h.forecast.id].signals
-              .slice(0, 2)
               .map(([label, value]) => `${label}：${value}`)
               .join(' / ')}
           </p>
           <ArrowRight size={14} aria-hidden="true" />
-          <strong>{compareForecast(h.forecast, h.marketEvent).message}</strong>
         </div>
       )}
       <div className={`result-insignia ${positive ? 'positive' : 'negative'}`}>

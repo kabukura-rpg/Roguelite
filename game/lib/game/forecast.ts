@@ -240,10 +240,11 @@ export function publicMarketInfo(s: {
 }) {
   const result = s.history.at(-1);
   return {
+    // The pattern name is an internal classification: players read the raw
+    // observations and draw their own conclusion, so it is never published.
     forecast:
       s.phase === 'forecast' && s.forecast
         ? {
-            name: FORECAST_PATTERNS[s.forecast.id].name,
             signals: FORECAST_PATTERNS[s.forecast.id].signals,
             enhanced: s.forecast.enhanced,
           }
