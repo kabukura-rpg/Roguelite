@@ -3,10 +3,10 @@ const basePath = process.env.GITHUB_PAGES === 'true' ? '/Roguelite' : '';
 
 const nextConfig: NextConfig = {
   output: 'export',
-  // Keep Next.js generated types separate from the local vinext cache.
+  // With output: 'export', a custom distDir changes the export destination.
+  // Keep the default .next build cache so the static site is written to out/.
   ...(process.env.GITHUB_PAGES === 'true'
     ? {
-        distDir: '.next-pages',
         typescript: { tsconfigPath: 'tsconfig.pages.json' },
       }
     : {}),

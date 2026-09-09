@@ -38,11 +38,11 @@ npm ci
 npm run build:pages
 ```
 
-ローカル開発の `npm run dev` と従来の `npm run build` は引き続きNext.js互換のvinextを使います。Pages用の `build:pages` はNext.js 16.3.4の `next build --webpack` を使い、`out/` にHTML・CSS・JavaScript・publicファイルを静的出力します。ゲームロジックとスタイルは共通です。Next.js用の生成キャッシュは `.next-pages/`、型チェック設定は `tsconfig.pages.json` に分け、ローカルvinextの生成型との衝突を防いでいます。`npm start` は従来のWorker用で、Pages出力のプレビューには使いません。
+ローカル開発の `npm run dev` と従来の `npm run build` は引き続きNext.js互換のvinextを使います。Pages用の `build:pages` はNext.js 16.3.4の `next build --webpack` を使い、`out/` にHTML・CSS・JavaScript・publicファイルを静的出力します。ゲームロジックとスタイルは共通です。Next.jsの中間生成物は既定の `.next/`、静的公開ファイルは `out/` に出力します。Pages用の型チェックには `tsconfig.pages.json` を使い、`.next/types/` を参照します。`output: 'export'` とカスタム `distDir` を組み合わせると、`distDir` が静的出力先になるため、ここでは指定しません。`npm start` は従来のWorker用で、Pages出力のプレビューには使いません。
 
 `next.config.ts` の `output: 'export'`、`trailingSlash: true`、`images.unoptimized: true` によりサーバー不要で配信します。Pagesビルド時だけ `GITHUB_PAGES=true` で `basePath: '/Roguelite'` を設定します。CSS・JSはNext.jsがprefixを付与するため、別の `assetPrefix` は不要です。`public/` のfaviconには `NEXT_PUBLIC_BASE_PATH` を明示的に付けています。通常のローカル開発URLは `/` のままです。
 
-`scripts/verify-pages.mjs` はトップページ・404・`.nojekyll` の存在と、HTML・CSSから参照する同一サイト内のアセットが `/Roguelite/` 内にあり、実ファイルとして出力されていることを検査します。`npm run verify:pages` でも再実行できます。ブラウザ操作のテストではありません。
+`scripts/verify-pages.mjs` は `.next/export-detail.json` で直近exportの成功と出力先が `out/` であることを確認したうえで、トップページ・404・`.nojekyll` の存在と、HTML・CSSから参照する同一サイト内のアセットが `/Roguelite/` 内にあり、実ファイルとして出力されていることを検査します。`npm run verify:pages` でも再実行できます。ブラウザ操作のテストではありません。過去の `.next-pages/` 出力設定では、ローカルに残った古い `out/` を検証して成功する問題がありました。出力先の確認により、この誤検知も防止します。
 
 `game/` は親リポジトリに通常ディレクトリとして登録されています。Gitの `160000`（gitlink）エントリ、`game/.git`、`.gitmodules` はありません。Actionsでもサブモジュールの取得を無効にし、gitlinkになっていないことと `game/package.json`・`game/app/page.tsx` の追跡を確認します。今後 `game/` 内で `git init` や `git submodule add` は行わず、親リポジトリから `git add game` で管理してください。
 

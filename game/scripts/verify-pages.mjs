@@ -46,6 +46,11 @@ async function inspectDirectory(directory) {
   }
 }
 
+// Reject a stale out/ left by an older build if Next exported somewhere else.
+const exportDetail = JSON.parse(await readFile(new URL('../.next/export-detail.json', import.meta.url), 'utf8'));
+assert.equal(exportDetail.success, true, 'Next.js static export did not finish successfully.');
+assert.equal(path.resolve(exportDetail.outDirectory), path.resolve(output),
+  `Next.js exported to ${exportDetail.outDirectory}; Pages requires ${output}`);
 const homepage = await readFile(path.join(output, 'index.html'), 'utf8');
 assert.ok(homepage.includes('株クラ'), 'The game homepage was not exported.');
 await stat(path.join(output, '404.html'));
