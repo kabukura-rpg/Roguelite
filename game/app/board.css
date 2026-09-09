@@ -2983,3 +2983,35 @@ body:has(.game-shell) {
     line-height: 1.5;
   }
 }
+
+/* Mandatory life expenses stay inside the existing incident board. */
+.expense-bill { margin-top: 16px; border: 1px solid #b6986555; border-radius: 12px; padding: 16px 20px; background: #101925; }
+.expense-amount { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #dab77c; }
+.expense-amount > span { font-size: 12px; letter-spacing: .08em; }
+.expense-amount > strong { font-size: clamp(24px, 4vw, 36px); font-weight: 500; }
+.expense-amount small { font-size: 13px; }
+.incident-life .expense-calculation, .incident-life .expense-allocation { font-size: 11px; line-height: 1.6; margin-top: 6px; color: #9fadc0; }
+.expense-balances { display: grid; gap: 8px; margin: 14px 0; }
+.expense-balances > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; border-bottom: 1px solid #ffffff12; padding-bottom: 6px; }
+.expense-balances dt { flex-shrink: 0; color: #a9b6c9; }
+.expense-balances dd { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; font-variant-numeric: tabular-nums; }
+.expense-shortfall { border-left: 2px solid #df946d; padding: 8px 12px; background: #df946d0a; color: #efb292; }
+.expense-shortfall > strong { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.incident-life .expense-shortfall p { font-size: 12px; line-height: 1.7; margin: 5px 0; }
+.expense-shortfall small { font-size: 11px; color: #c6b99f; }
+.incident-life .expense-covered { color: #91cbb1; font-size: 13px; }
+.incident-life > footer { justify-content: flex-end; }
+.incident-life > footer .primary { white-space: normal; min-height: 44px; height: auto; padding: 10px 16px; }
+@media (max-width: 680px), (max-height: 760px) {
+  .incident-life .incident-body { padding: 8px 0; }
+  .incident-life .incident-icon { width: 26px; height: 26px; }
+  .incident-life h2 { font-size: 22px; margin: 6px 0; overflow-wrap: anywhere; }
+  .incident-life .incident-body > p { font-size: 12px; line-height: 1.6; }
+  .expense-bill { margin-top: 10px; padding: 10px 12px; }
+  .expense-balances { margin: 8px 0; }
+  .expense-balances > div { font-size: 12px; gap: 8px; }
+  .expense-shortfall { padding: 6px 8px; }
+  .incident-life .incident-outcome { padding: 10px; }
+}
+.incident-life .incident-body { height: 100%; margin: 0 auto; scrollbar-width: thin; scrollbar-color: #536071 #131c28; }
+.incident-life .expense-bill p { margin: 4px 0; }

@@ -1,4 +1,5 @@
 import type { CardId } from './cards.ts';
+import { EXPENSE_CONFIG, type ExpenseRecord } from './expenses.ts';
 
 export type IncidentChoice = {
   id: string;
@@ -18,6 +19,7 @@ export type Incident = {
   description: string;
   cost?: number;
   range?: [number, number];
+  weight?: number;
   choices?: IncidentChoice[];
 };
 export const INCIDENT_RULES = { probability: 0.3, minimum: 4, turns: 20 };
@@ -84,6 +86,24 @@ export const INCIDENTS: Incident[] = [
         '退去時の補修と荷物の運搬に、予定外の費用がかかった。',
         110000,
       ],
+      [
+        'device',
+        'PC・スマートフォンの故障',
+        '仕事や連絡に欠かせない端末が故障。修理と交換が必要になった。',
+        80000,
+      ],
+      [
+        'homecoming',
+        '急な帰省費用',
+        '家族の事情で帰省が必要に。交通と滞在の費用を支払う。',
+        70000,
+      ],
+      [
+        'renewal',
+        '住まいの更新費用',
+        '住まいの更新時期が来た。継続に必要な費用を支払う。',
+        100000,
+      ],
     ] as const
   ).map(([id, name, description, cost]) => ({
     id,
@@ -92,6 +112,15 @@ export const INCIDENTS: Incident[] = [
     cost,
     kind: 'life' as const,
   })),
+  {
+    id: 'tax',
+    kind: 'life',
+    name: '想定外の税負担',
+    description:
+      '追加の納付通知が届いた。今回の必要額は総資産の8%、最低8万円・最大30万円。生活防衛資金があればさらに10%軽減される。',
+    cost: EXPENSE_CONFIG.taxMin,
+    weight: EXPENSE_CONFIG.taxWeight,
+  },
   {
     id: 'stranger',
     kind: 'chance',
@@ -213,7 +242,7 @@ export const INCIDENTS: Incident[] = [
     ],
   },
 ];
-export type IncidentRecord = {
+export type IncidentRecord = ExpenseRecord & {
   id: string;
   turn: number;
   choice: string;
@@ -271,7 +300,10 @@ export function drawIncident(s: IncidentState, turn: number) {
     (needed < slots && incidentRandom(s) >= INCIDENT_RULES.probability)
   )
     return null;
-  const incident = available[Math.floor(incidentRandom(s) * available.length)];
+  let ticket =
+    incidentRandom(s) * available.reduce((sum, e) => sum + (e.weight ?? 1), 0);
+  const incident =
+    available.find((e) => (ticket -= e.weight ?? 1) < 0) ?? available.at(-1)!;
   s.lastIncidentTurn = turn;
   s.currentIncident = incident.id;
   return incident;

@@ -1,10 +1,17 @@
 import {
+  createExpenses,
+  expenseRandom,
+  quoteExpense,
+  currentExpenseQuote,
+  expensePayment,
+  type ExpenseState,
+} from './expenses.ts';
+import {
   createPortfolio,
   portfolioAllocation,
   portfolioReturn,
   portfolioDividend,
   dividendReinvestment,
-  lifeExpense,
   drawGrowthChoices,
   acquireGrowth,
   isCoreAsset,
@@ -94,6 +101,7 @@ export type History = {
 };
 export type State = DeckState &
   IncidentState &
+  ExpenseState &
   PortfolioState & {
     phase: Phase;
     turn: number;
@@ -144,6 +152,7 @@ export function createGame(seed = 1, debug = false): State {
   return {
     ...createDeck(seed),
     ...createIncidents(seed),
+    ...createExpenses(seed),
     ...createPortfolio(seed),
     shopSpent: 0,
     phase: 'title',
@@ -428,6 +437,7 @@ export function applyDecision(
 }
 export function cloneState(state: State): State {
   return {
+    ...createExpenses(state.seed),
     ...createPortfolio(state.seed),
     ...state,
     satellites: [...(state.satellites ?? [])],
@@ -548,6 +558,7 @@ export function calculateTitles(s: State) {
 }
 function finishYear(s: State) {
   s.currentIncident = null;
+  s.currentExpense = null;
   if (checkGameOver(s)) s.phase = 'gameOver';
   else if (s.turn >= C.totalTurns) s.phase = 'clear';
   else if (
@@ -593,7 +604,12 @@ export function resolveIncident(s: State, choiceId: string): boolean {
     rate: number | null = null,
     message = '';
   if (event.kind === 'life') {
-    const required = lifeExpense(event.cost!, s.longTermStrategies);
+    const { required } = expensePayment(
+      s.cash,
+      s.investedAssets,
+      currentExpenseQuote(s, event),
+      s.longTermStrategies,
+    );
     cost = Math.min(totalAssets(s), required);
     forcedSale = Math.max(0, cost - s.cash);
     payCost(s, required);
@@ -601,7 +617,7 @@ export function resolveIncident(s: State, choiceId: string): boolean {
       cost < required
         ? '支払える資産をすべて充てました。資産が尽き、冒険は終了です。'
         : forcedSale
-          ? '現金だけでは足りず、不足分の投資資産を強制売却しました。'
+          ? '現金が不足し、保有比率どおりに投資資産を強制売却しました。運用元本が減り、今後の値上がり益や配当にも影響します。'
           : '手元の現金で支払い、投資資産を売らずに済みました。';
   } else if (event.kind === 'shock') {
     const [low, high] = event.range!;
@@ -657,6 +673,21 @@ export function resolveIncident(s: State, choiceId: string): boolean {
   }
   updateDrawdown(s);
   s.incidentHistory.push({
+    ...(event.kind === 'life'
+      ? {
+          expense: { ...currentExpenseQuote(s, event) },
+          requiredCost: expensePayment(
+            cashBefore,
+            investedBefore,
+            currentExpenseQuote(s, event),
+            s.longTermStrategies,
+          ).required,
+          soldAllocation:
+            forcedSale > 0
+              ? portfolioAllocation(s.assetType, s.satellites)
+              : [],
+        }
+      : {}),
     id: event.id,
     turn: s.turn,
     choice:
@@ -767,9 +798,15 @@ export function reducer(state: State, action: Action): State {
       !checkGameOver(s) &&
       s.history.at(-1)?.resolution === 'strategy' &&
       drawIncident(s, s.turn)
-    )
+    ) {
       s.phase = 'incident';
-    else finishYear(s);
+      const event = INCIDENTS.find((e) => e.id === s.currentIncident)!;
+      // The bill is drawn once, on encounter, so reads and saves cannot reroll it.
+      s.currentExpense =
+        event.kind === 'life'
+          ? quoteExpense(event.id, s.turn, totalAssets(s), expenseRandom(s))
+          : null;
+    } else finishYear(s);
   } else if (action.type === 'INCIDENT_CHOICE' && s.phase === 'incident') {
     if (!resolveIncident(s, action.choiceId)) return state;
   } else if (action.type === 'INCIDENT_NEXT' && s.phase === 'incidentResult') {

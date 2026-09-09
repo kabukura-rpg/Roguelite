@@ -1,8 +1,16 @@
 'use client';
-import { ArrowRight, CloudLightning, HeartPulse, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  CloudLightning,
+  HeartPulse,
+  Sparkles,
+  TriangleAlert,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CARDS } from '@/lib/game/cards';
-import { lifeExpense, PORTFOLIO_CONFIG } from '@/lib/game/portfolio';
+import { PORTFOLIO_CONFIG, portfolioAllocation } from '@/lib/game/portfolio';
+import { ASSETS } from '@/lib/game/data';
+import { currentExpenseQuote, expensePayment } from '@/lib/game/expenses';
 import { INCIDENTS } from '@/lib/game/incidents';
 import { totalAssets, type State, type Action } from '@/lib/game/engine';
 
@@ -15,9 +23,14 @@ export function IncidentBoard({
   commit: (action: Action) => unknown;
 }) {
   const event = INCIDENTS.find((e) => e.id === s.currentIncident)!;
-  const required = event.cost
-    ? lifeExpense(event.cost, s.longTermStrategies)
-    : 0;
+  const quote = currentExpenseQuote(s, event);
+  const bill = expensePayment(
+    s.cash,
+    s.investedAssets,
+    quote,
+    s.longTermStrategies,
+  );
+  const { required } = bill;
   const result =
     s.phase === 'incidentResult' ? s.incidentHistory.at(-1)! : null;
   const Icon =
@@ -54,7 +67,10 @@ export function IncidentBoard({
         ? [
             {
               id: 'pay',
-              label: `${yen(required)}円を支払う`,
+              label:
+                bill.forcedSale > 0
+                  ? '資産を売却して支払いを確定'
+                  : '支払いを確定',
               hint: '現金から支払い、不足分だけ投資資産を強制売却します。',
             },
           ]
@@ -100,13 +116,52 @@ export function IncidentBoard({
                 {yen(result.forcedSale)}円
               </p>
             )}
+            {event.kind === 'life' && (
+              <>
+                <dl className="expense-balances">
+                  <div>
+                    <dt>現金</dt>
+                    <dd>
+                      {yen(result.cashBefore)}円 <ArrowRight size={14} />{' '}
+                      {yen(result.cashAfter)}円
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>投資資産</dt>
+                    <dd>
+                      {yen(result.investedBefore)}円 <ArrowRight size={14} />{' '}
+                      {yen(result.investedAfter)}円
+                    </dd>
+                  </div>
+                </dl>
+                {!!result.soldAllocation?.length && (
+                  <p className="expense-allocation">
+                    比率を保って売却：
+                    {result.soldAllocation
+                      .map(
+                        (p) =>
+                          `${ASSETS[p.assetId].name} ${Math.round(p.weight * 100)}%`,
+                      )
+                      .join(' / ')}
+                  </p>
+                )}
+                {(result.requiredCost ?? result.cost) > result.cost && (
+                  <p className="expense-shortfall">
+                    全資産を充てても {yen(result.requiredCost! - result.cost)}
+                    円不足。これ以上の借金は発生しません。
+                  </p>
+                )}
+              </>
+            )}
             {result.card && (
               <p>獲得カード：{CARDS[result.card].name}（捨て札へ）</p>
             )}
-            <p>
-              現金 {yen(result.cashAfter)}円 / 投資資産{' '}
-              {yen(result.investedAfter)}円
-            </p>
+            {event.kind !== 'life' && (
+              <p>
+                現金 {yen(result.cashAfter)}円 / 投資資産{' '}
+                {yen(result.investedAfter)}円
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -116,38 +171,90 @@ export function IncidentBoard({
               </p>
             )}
             {event.kind === 'life' && (
-              <p className="incident-note">
-                必要額 {yen(required)}円
-                {required < (event.cost ?? 0)
-                  ? '（生活防衛資金で10%軽減）'
-                  : ''}{' '}
-                · 手元の現金 {yen(s.cash)}円
-                {required > totalAssets(s) ? ' · 支払いで資産が尽きます' : ''}
-              </p>
-            )}
-            <div className="incident-choices">
-              {choices.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  disabled={
-                    s.cash < (('cost' in choice ? choice.cost : 0) ?? 0)
-                  }
-                  onClick={() =>
-                    commit({ type: 'INCIDENT_CHOICE', choiceId: choice.id })
-                  }
-                >
+              <div className="expense-bill">
+                <div className="expense-amount">
+                  <span>支払い必須</span>
                   <strong>
-                    {choice.label}
-                    <ArrowRight size={16} />
+                    {yen(required)}
+                    <small> 円</small>
                   </strong>
-                  <span>{choice.hint}</span>
-                  {'cost' in choice && s.cash < (choice.cost ?? 0) && (
-                    <small>現金が不足しています</small>
-                  )}
-                </button>
-              ))}
-            </div>
+                </div>
+                <p className="expense-calculation">
+                  {quote.model === 'year'
+                    ? `基本額 ${yen(quote.baseAmount)}円 · 資産補正 ${quote.amount >= quote.baseAmount ? '+' : ''}${yen(quote.amount - quote.baseAmount)}円`
+                    : quote.model === 'tax'
+                      ? '総資産の8%（8万〜30万円）'
+                      : '保存済みの必要経費'}
+                  {required < quote.amount ? ' · 生活防衛資金 −10%' : ''}
+                </p>
+                <dl className="expense-balances">
+                  <div>
+                    <dt>所持現金</dt>
+                    <dd>{yen(s.cash)}円</dd>
+                  </div>
+                </dl>
+                {bill.shortage > 0 ? (
+                  // The shortfall is a live status for assistive technology.
+                  // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+                  <div className="expense-shortfall" role="status">
+                    <strong>
+                      <TriangleAlert size={18} /> 現金が不足しています
+                    </strong>
+                    <p>
+                      {yen(bill.shortage)}
+                      円分の投資資産を売却する必要があります。
+                    </p>
+                    {bill.unpaid > 0 ? (
+                      <p>
+                        投資資産をすべて売却しても {yen(bill.unpaid)}
+                        円不足し、冒険は終了します。
+                      </p>
+                    ) : (
+                      <p>
+                        保有比率を維持して売却。運用と配当の元本が減ります。
+                      </p>
+                    )}
+                    <small>
+                      {portfolioAllocation(s.assetType, s.satellites)
+                        .map(
+                          (p) =>
+                            `${ASSETS[p.assetId].name} ${Math.round(p.weight * 100)}%`,
+                        )
+                        .join(' / ')}
+                    </small>
+                  </div>
+                ) : (
+                  <p className="expense-covered">
+                    現金で支払えます。投資資産の売却は不要です。
+                  </p>
+                )}
+              </div>
+            )}
+            {event.kind !== 'life' && (
+              <div className="incident-choices">
+                {choices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    disabled={
+                      s.cash < (('cost' in choice ? choice.cost : 0) ?? 0)
+                    }
+                    onClick={() =>
+                      commit({ type: 'INCIDENT_CHOICE', choiceId: choice.id })
+                    }
+                  >
+                    <strong>
+                      {choice.label}
+                      <ArrowRight size={16} />
+                    </strong>
+                    <span>{choice.hint}</span>
+                    {'cost' in choice && s.cash < (choice.cost ?? 0) && (
+                      <small>現金が不足しています</small>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -171,6 +278,14 @@ export function IncidentBoard({
                   ? 'カード報酬へ'
                   : '次の年へ'}
             <ArrowRight />
+          </Button>
+        ) : event.kind === 'life' ? (
+          <Button
+            className="primary"
+            onClick={() => commit({ type: 'INCIDENT_CHOICE', choiceId: 'pay' })}
+          >
+            {choices[0].label}
+            <ArrowRight size={16} />
           </Button>
         ) : (
           <small>

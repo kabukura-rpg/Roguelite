@@ -27,12 +27,12 @@ import {
   isCoreAsset,
   portfolioAllocation,
   growthOption,
-  lifeExpense,
   type GrowthId,
 } from '@/lib/game/portfolio';
 import { IncidentLog } from '@/components/game/incidents';
 import { publicMarketInfo } from '@/lib/game/forecast';
 import { INCIDENTS } from '@/lib/game/incidents';
+import { currentExpenseQuote, expensePayment } from '@/lib/game/expenses';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -335,6 +335,14 @@ type ModelTool = {
   annotations: { readOnlyHint: boolean };
   execute: (input: unknown) => unknown;
 };
+// Shared by the WebMCP snapshot: the same bill the incident board shows.
+const expenseBill = (s: State, incident: { id: string; cost?: number }) =>
+  expensePayment(
+    s.cash,
+    s.investedAssets,
+    currentExpenseQuote(s, incident),
+    s.longTermStrategies,
+  );
 export default function Home() {
   const [state, setState] = useState<State>(() => createGame());
   const stateRef = useRef(state);
@@ -388,8 +396,10 @@ export default function Home() {
               description: incident.description,
               cost:
                 incident.kind === 'life'
-                  ? lifeExpense(incident.cost!, s.longTermStrategies)
+                  ? expenseBill(s, incident)?.required
                   : incident.cost,
+              payment:
+                incident.kind === 'life' ? expenseBill(s, incident) : undefined,
               choices:
                 incident.choices ??
                 (incident.kind === 'life'
