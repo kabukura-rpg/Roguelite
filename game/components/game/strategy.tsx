@@ -387,7 +387,12 @@ export function StrategyOutcome({ entry }: { entry: History }) {
         </span>
       </div>
       <div className="outcome-rate">
-        <span>{ASSETS[entry.assetType].name}の相場リターン</span>
+        <span>
+          {entry.portfolio && entry.portfolio.length > 1
+            ? 'ポートフォリオ'
+            : ASSETS[entry.assetType].name}
+          の相場リターン
+        </span>
         <strong>
           {pct(entry.baseReturn)} <ArrowRight size={17} />{' '}
           <b className={entry.effectiveReturn >= 0 ? 'positive' : 'negative'}>
@@ -395,6 +400,33 @@ export function StrategyOutcome({ entry }: { entry: History }) {
           </b>
         </strong>
       </div>
+      {entry.portfolio && entry.assetReturns && (
+        <dl className="portfolio-return-detail">
+          {entry.portfolio.map((p) => (
+            <div key={p.assetId}>
+              <dt>
+                {ASSETS[p.assetId].name} {Math.round(p.weight * 100)}%
+              </dt>
+              <dd>{pct(entry.assetReturns![p.assetId])}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {!!entry.dividendReinvested && (
+        <p>
+          高配当株の配当 {yen(entry.dividend)}円のうち
+          {yen(entry.dividendReinvested)}円を再投資。
+        </p>
+      )}
+      {!!entry.yearStartFunding?.contribution && (
+        <p>
+          年初の年間積立 +{yen(entry.yearStartFunding.contribution)}
+          円（半分を投資）。
+        </p>
+      )}
+      {!!entry.yearStartFunding?.cashTopUp && (
+        <p>年初の現金管理 +{yen(entry.yearStartFunding.cashTopUp)}円。</p>
+      )}
       {entry.cardId && <p>{CARDS[entry.cardId].description}</p>}
       {entry.cashReserved > 0 && (
         <p>相場の前に {yen(entry.cashReserved)}円を現金化。</p>

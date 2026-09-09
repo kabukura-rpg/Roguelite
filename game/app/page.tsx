@@ -21,6 +21,15 @@ import {
   GameTools,
   AssetRatings,
 } from '@/components/game/board';
+import { PortfolioSummary } from '@/components/game/portfolio';
+import {
+  CORE_ASSETS,
+  isCoreAsset,
+  portfolioAllocation,
+  growthOption,
+  lifeExpense,
+  type GrowthId,
+} from '@/lib/game/portfolio';
 import { IncidentLog } from '@/components/game/incidents';
 import { publicMarketInfo } from '@/lib/game/forecast';
 import { INCIDENTS } from '@/lib/game/incidents';
@@ -218,7 +227,7 @@ function AssetChoices({
 }) {
   return (
     <div className="asset-grid">
-      {Object.values(ASSETS).map((a) => (
+      {CORE_ASSETS.map((id) => ASSETS[id]).map((a) => (
         <button
           type="button"
           className={`asset-card ${current === a.id ? 'selected' : ''}`}
@@ -377,7 +386,10 @@ export default function Home() {
               kind: incident.kind,
               name: incident.name,
               description: incident.description,
-              cost: incident.cost,
+              cost:
+                incident.kind === 'life'
+                  ? lifeExpense(incident.cost!, s.longTermStrategies)
+                  : incident.cost,
               choices:
                 incident.choices ??
                 (incident.kind === 'life'
@@ -391,6 +403,12 @@ export default function Home() {
         phase: s.phase,
         year: s.turn,
         asset: s.assetType,
+        portfolio: portfolioAllocation(s.assetType, s.satellites),
+        longTermStrategies: s.longTermStrategies,
+        growthChoices:
+          s.phase === 'growth'
+            ? s.growthChoices.map((id) => ({ id, ...growthOption(id) }))
+            : undefined,
         invested: s.investedAssets,
         cash: s.cash,
         total: totalAssets(s),
@@ -425,7 +443,7 @@ export default function Home() {
       {
         name: 'play_kabukura_action',
         description:
-          '市場予報を読み、結果を知る前にselect_cardで手札のinstanceId（nullで解除）を選び、resolveで戦略確定後に相場を抽選。rewardはcardId（nullでスキップ）。ショップはshop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。投資先は開始時の選択から変わりません。',
+          '市場予報を読み、結果を知る前にselect_cardで手札のinstanceId（nullで解除）を選び、resolveで戦略確定後に相場を抽選。rewardはcardId（nullでスキップ）。ショップはshop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。コアは開始時から固定。growthではchoiceIdを選び、サテライトか長期方針を獲得します。',
         inputSchema: {
           type: 'object',
           properties: {
@@ -440,12 +458,13 @@ export default function Home() {
                 'next',
                 'select_card',
                 'reward',
+                'growth',
                 'shop_buy',
                 'shop_remove',
                 'leave_shop',
               ],
             },
-            assetId: { type: 'string', enum: Object.keys(ASSETS) },
+            assetId: { type: 'string', enum: [...CORE_ASSETS] },
             instanceId: { type: ['string', 'null'] },
             cardId: {
               type: ['string', 'null'],
@@ -468,7 +487,7 @@ export default function Home() {
           else if (
             v.action === 'select_asset' &&
             typeof v.assetId === 'string' &&
-            Object.hasOwn(ASSETS, v.assetId)
+            isCoreAsset(v.assetId)
           )
             action = { type: 'SELECT_ASSET', assetId: v.assetId as AssetId };
           else if (
@@ -498,6 +517,8 @@ export default function Home() {
             typeof v.instanceId === 'string'
           )
             action = { type: 'SHOP_REMOVE', instanceId: v.instanceId };
+          else if (v.action === 'growth' && typeof v.choiceId === 'string')
+            action = { type: 'GROWTH', choiceId: v.choiceId as GrowthId };
           else if (v.action === 'leave_shop') action = { type: 'LEAVE_SHOP' };
           else throw new Error('操作または選択肢が不正です');
           const before = stateRef.current;
@@ -583,7 +604,7 @@ export default function Home() {
               <Compass /> 全20年の旅
             </span>
             <span>
-              <Shield /> 6つの投資先 × 7つの戦略
+              <Shield /> 3つのコア × 7つの戦略
             </span>
           </div>
         </section>
@@ -592,10 +613,10 @@ export default function Home() {
         <section className="selection-screen">
           <div className="section-heading">
             <div>
-              <span className="eyebrow gold">PREPARATION / 旅の支度</span>
+              <span className="eyebrow gold">CORE ASSET / 旅の支度</span>
               <h1 className="page-title">20年の相棒を選ぼう。</h1>
               <p>
-                80万円をひとつの投資先へ。20万円は、次の一手のために。この投資先で20年間を戦います。
+                80万円をコアへ、20万円を現金へ。コアは20年間固定し、旅の途中でサテライトと長期方針を加えます。
               </p>
             </div>
             <span className="setup-money">
@@ -611,7 +632,7 @@ export default function Home() {
           <div className="info-line">
             <Info size={17} />
             <span>
-  初期デッキは10枚。毎年5枚を引き、戦略カードを1枚まで使えます。投資先は最初に選んだひとつで20年を戦います。
+              初期デッキは10枚。毎年5枚を引き、戦略カードを1枚まで使えます。コアは固定。4・8・12・16年目にポートフォリオが成長します。
             </span>
           </div>
           <Button
@@ -688,6 +709,7 @@ export default function Home() {
                     {yen(s.shopSpent)}円。
                   </p>
                 )}
+                <PortfolioSummary state={s} final />
                 <CardResult state={s} />
                 <IncidentLog state={s} />
                 {last && (
@@ -826,6 +848,12 @@ export default function Home() {
               <strong>戦略を確定して、結果を見る</strong>
               <p>
                 選んだカードを使うか、カードを使わずに進みます。ドルコスト平均法は現金75%、逆張りは現金50%を追加投資。現金確保は投資額20%を現金化します。カードなしなら現在の配分を維持します。損切りは損失−25%・利益+14%が上限。レバレッジは利益も損失も2倍です。
+              </p>
+            </li>
+            <li>
+              <strong>4年ごとにポートフォリオを育てる</strong>
+              <p>
+                4・8・12・16年目の相場と突発イベントの後、3つの候補から恒久効果を1つ獲得します。高配当株・ゴールド・債券は各20%、最大2つまで。同じ資産・方針は重複しません。比率は現金を除いた投資資産の内訳です。高配当株の配当は保有部分だけに発生し、配当再投資の方針を持つ場合だけ半分を再投資します。
               </p>
             </li>
             <li>

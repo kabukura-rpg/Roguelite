@@ -1,0 +1,798 @@
+{
+  "seeds": 600,
+  "runs": 25200,
+  "coreAssets": [
+    "allWorld",
+    "sp500",
+    "nasdaq"
+  ],
+  "returnTableChanged": false,
+  "rows": [
+    {
+      "core": "allWorld",
+      "preference": "長期方針優先",
+      "cards": false,
+      "n": 600,
+      "p10": 897111,
+      "median": 1622486,
+      "p90": 2791610,
+      "goalRate": 0.06333333333333334,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.26985994486829185,
+      "targetExactRate": 0.615,
+      "medianContributions": 270000,
+      "compositions": {
+        "dividend": 75,
+        "none": 369,
+        "gold": 84,
+        "bonds": 72
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "長期方針優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1369265,
+      "median": 2827777,
+      "p90": 5950727,
+      "goalRate": 0.48,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.26468124974540713,
+      "targetExactRate": 0.615,
+      "medianContributions": 310000,
+      "compositions": {
+        "dividend": 75,
+        "none": 369,
+        "gold": 84,
+        "bonds": 72
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "高配当株優先",
+      "cards": false,
+      "n": 600,
+      "p10": 878863,
+      "median": 1556210,
+      "p90": 2672545,
+      "goalRate": 0.051666666666666666,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.27374722318893374,
+      "targetExactRate": 0.97,
+      "medianContributions": 240000,
+      "compositions": {
+        "dividend": 582,
+        "none": 18
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "高配当株優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1288103,
+      "median": 2752448,
+      "p90": 5775546,
+      "goalRate": 0.45166666666666666,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.26586574214925285,
+      "targetExactRate": 0.97,
+      "medianContributions": 240000,
+      "compositions": {
+        "dividend": 582,
+        "none": 18
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "ゴールド優先",
+      "cards": false,
+      "n": 600,
+      "p10": 944858,
+      "median": 1575908,
+      "p90": 2488178,
+      "goalRate": 0.03166666666666667,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.23025768693221524,
+      "targetExactRate": 0.98,
+      "medianContributions": 240000,
+      "compositions": {
+        "gold": 588,
+        "none": 12
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "ゴールド優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1408387,
+      "median": 2630366,
+      "p90": 5002810,
+      "goalRate": 0.425,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.22465634199411239,
+      "targetExactRate": 0.98,
+      "medianContributions": 240000,
+      "compositions": {
+        "gold": 588,
+        "none": 12
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 929163,
+      "median": 1529580,
+      "p90": 2525540,
+      "goalRate": 0.041666666666666664,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2527429742388759,
+      "targetExactRate": 0.975,
+      "medianContributions": 240000,
+      "compositions": {
+        "bonds": 585,
+        "none": 15
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1380395,
+      "median": 2688312,
+      "p90": 5345034,
+      "goalRate": 0.425,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2403213704710255,
+      "targetExactRate": 0.975,
+      "medianContributions": 240000,
+      "compositions": {
+        "bonds": 585,
+        "none": 15
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "高配当株＋ゴールド優先",
+      "cards": false,
+      "n": 600,
+      "p10": 922363,
+      "median": 1513013,
+      "p90": 2413371,
+      "goalRate": 0.03166666666666667,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.231781783282848,
+      "targetExactRate": 0.9216666666666666,
+      "medianContributions": 160000,
+      "compositions": {
+        "dividend+gold": 553,
+        "gold": 18,
+        "dividend": 29
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "高配当株＋ゴールド優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1352038,
+      "median": 2523962,
+      "p90": 4858684,
+      "goalRate": 0.3883333333333333,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.22517706080712627,
+      "targetExactRate": 0.9216666666666666,
+      "medianContributions": 160000,
+      "compositions": {
+        "dividend+gold": 553,
+        "gold": 18,
+        "dividend": 29
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "高配当株＋債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 887151,
+      "median": 1483362,
+      "p90": 2435133,
+      "goalRate": 0.025,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2543354430379747,
+      "targetExactRate": 0.9183333333333333,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+dividend": 551,
+        "bonds": 18,
+        "dividend": 31
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "高配当株＋債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1270669,
+      "median": 2582420,
+      "p90": 5092375,
+      "goalRate": 0.38666666666666666,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.24216739758010414,
+      "targetExactRate": 0.9183333333333333,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+dividend": 551,
+        "bonds": 18,
+        "dividend": 31
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "ゴールド＋債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 950848,
+      "median": 1495723,
+      "p90": 2302523,
+      "goalRate": 0.02,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2157787655576218,
+      "targetExactRate": 0.92,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+gold": 552,
+        "gold": 36,
+        "bonds": 12
+      }
+    },
+    {
+      "core": "allWorld",
+      "preference": "ゴールド＋債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1395550,
+      "median": 2482663,
+      "p90": 4499748,
+      "goalRate": 0.33,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2039152300230042,
+      "targetExactRate": 0.92,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+gold": 552,
+        "gold": 36,
+        "bonds": 12
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "長期方針優先",
+      "cards": false,
+      "n": 600,
+      "p10": 841257,
+      "median": 1883231,
+      "p90": 3993451,
+      "goalRate": 0.195,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.33833093138698195,
+      "targetExactRate": 0.615,
+      "medianContributions": 280000,
+      "compositions": {
+        "dividend": 75,
+        "none": 369,
+        "gold": 84,
+        "bonds": 72
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "長期方針優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1423989,
+      "median": 3798433,
+      "p90": 10589483,
+      "goalRate": 0.6233333333333333,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.3288613110227089,
+      "targetExactRate": 0.615,
+      "medianContributions": 310000,
+      "compositions": {
+        "dividend": 75,
+        "none": 369,
+        "gold": 84,
+        "bonds": 72
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "高配当株優先",
+      "cards": false,
+      "n": 600,
+      "p10": 822310,
+      "median": 1769282,
+      "p90": 3710443,
+      "goalRate": 0.17833333333333334,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.3395859946106721,
+      "targetExactRate": 0.97,
+      "medianContributions": 240000,
+      "compositions": {
+        "dividend": 582,
+        "none": 18
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "高配当株優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1323401,
+      "median": 3611303,
+      "p90": 9894423,
+      "goalRate": 0.575,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.32471334748047914,
+      "targetExactRate": 0.97,
+      "medianContributions": 240000,
+      "compositions": {
+        "dividend": 582,
+        "none": 18
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "ゴールド優先",
+      "cards": false,
+      "n": 600,
+      "p10": 903262,
+      "median": 1845441,
+      "p90": 3432423,
+      "goalRate": 0.15666666666666668,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.29661561426389516,
+      "targetExactRate": 0.98,
+      "medianContributions": 240000,
+      "compositions": {
+        "gold": 588,
+        "none": 12
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "ゴールド優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1463351,
+      "median": 3440750,
+      "p90": 8349235,
+      "goalRate": 0.5883333333333334,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2862851165532283,
+      "targetExactRate": 0.98,
+      "medianContributions": 240000,
+      "compositions": {
+        "gold": 588,
+        "none": 12
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 894909,
+      "median": 1738689,
+      "p90": 3505722,
+      "goalRate": 0.16166666666666665,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.31954907930853527,
+      "targetExactRate": 0.975,
+      "medianContributions": 240000,
+      "compositions": {
+        "bonds": 585,
+        "none": 15
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1438309,
+      "median": 3478988,
+      "p90": 9138941,
+      "goalRate": 0.5833333333333334,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.3030346031950237,
+      "targetExactRate": 0.975,
+      "medianContributions": 240000,
+      "compositions": {
+        "bonds": 585,
+        "none": 15
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "高配当株＋ゴールド優先",
+      "cards": false,
+      "n": 600,
+      "p10": 885921,
+      "median": 1717487,
+      "p90": 3256041,
+      "goalRate": 0.13,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2923786306890909,
+      "targetExactRate": 0.9216666666666666,
+      "medianContributions": 160000,
+      "compositions": {
+        "dividend+gold": 553,
+        "gold": 18,
+        "dividend": 29
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "高配当株＋ゴールド優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1413736,
+      "median": 3232389,
+      "p90": 7772117,
+      "goalRate": 0.5416666666666666,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.28221284372062716,
+      "targetExactRate": 0.9216666666666666,
+      "medianContributions": 160000,
+      "compositions": {
+        "dividend+gold": 553,
+        "gold": 18,
+        "dividend": 29
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "高配当株＋債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 845474,
+      "median": 1682901,
+      "p90": 3312863,
+      "goalRate": 0.13333333333333333,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.3158649767903023,
+      "targetExactRate": 0.9183333333333333,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+dividend": 551,
+        "bonds": 18,
+        "dividend": 31
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "高配当株＋債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1334333,
+      "median": 3292093,
+      "p90": 8249111,
+      "goalRate": 0.535,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2936120698285469,
+      "targetExactRate": 0.9183333333333333,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+dividend": 551,
+        "bonds": 18,
+        "dividend": 31
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "ゴールド＋債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 927198,
+      "median": 1719643,
+      "p90": 3104830,
+      "goalRate": 0.11166666666666666,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.2763870167375593,
+      "targetExactRate": 0.92,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+gold": 552,
+        "gold": 36,
+        "bonds": 12
+      }
+    },
+    {
+      "core": "sp500",
+      "preference": "ゴールド＋債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1498032,
+      "median": 3195445,
+      "p90": 7327277,
+      "goalRate": 0.535,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.25333122800685737,
+      "targetExactRate": 0.92,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+gold": 552,
+        "gold": 36,
+        "bonds": 12
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "長期方針優先",
+      "cards": false,
+      "n": 600,
+      "p10": 620513,
+      "median": 1730308,
+      "p90": 4963502,
+      "goalRate": 0.24,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.47286466282671424,
+      "targetExactRate": 0.615,
+      "medianContributions": 280000,
+      "compositions": {
+        "dividend": 75,
+        "none": 369,
+        "gold": 84,
+        "bonds": 72
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "長期方針優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1095160,
+      "median": 4085459,
+      "p90": 17120164,
+      "goalRate": 0.61,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.46432641756422804,
+      "targetExactRate": 0.615,
+      "medianContributions": 310000,
+      "compositions": {
+        "dividend": 75,
+        "none": 369,
+        "gold": 84,
+        "bonds": 72
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "高配当株優先",
+      "cards": false,
+      "n": 600,
+      "p10": 614685,
+      "median": 1691106,
+      "p90": 4628384,
+      "goalRate": 0.21166666666666667,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.4577134920718087,
+      "targetExactRate": 0.97,
+      "medianContributions": 240000,
+      "compositions": {
+        "dividend": 582,
+        "none": 18
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "高配当株優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1063403,
+      "median": 3804162,
+      "p90": 15608556,
+      "goalRate": 0.58,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.44860153548638015,
+      "targetExactRate": 0.97,
+      "medianContributions": 240000,
+      "compositions": {
+        "dividend": 582,
+        "none": 18
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "ゴールド優先",
+      "cards": false,
+      "n": 600,
+      "p10": 710760,
+      "median": 1766548,
+      "p90": 4376220,
+      "goalRate": 0.21333333333333335,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.4155384144792597,
+      "targetExactRate": 0.98,
+      "medianContributions": 240000,
+      "compositions": {
+        "gold": 588,
+        "none": 12
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "ゴールド優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1196151,
+      "median": 3865952,
+      "p90": 13394091,
+      "goalRate": 0.5866666666666667,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.410157,
+      "targetExactRate": 0.98,
+      "medianContributions": 240000,
+      "compositions": {
+        "gold": 588,
+        "none": 12
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 695711,
+      "median": 1679413,
+      "p90": 4424059,
+      "goalRate": 0.21666666666666667,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.43658718923927936,
+      "targetExactRate": 0.975,
+      "medianContributions": 240000,
+      "compositions": {
+        "bonds": 585,
+        "none": 15
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1142288,
+      "median": 3862369,
+      "p90": 15104788,
+      "goalRate": 0.5933333333333334,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.41910577441637414,
+      "targetExactRate": 0.975,
+      "medianContributions": 240000,
+      "compositions": {
+        "bonds": 585,
+        "none": 15
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "高配当株＋ゴールド優先",
+      "cards": false,
+      "n": 600,
+      "p10": 708854,
+      "median": 1652397,
+      "p90": 3873332,
+      "goalRate": 0.19666666666666666,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.40221867396593675,
+      "targetExactRate": 0.9216666666666666,
+      "medianContributions": 160000,
+      "compositions": {
+        "dividend+gold": 553,
+        "gold": 18,
+        "dividend": 29
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "高配当株＋ゴールド優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1156333,
+      "median": 3468920,
+      "p90": 11899152,
+      "goalRate": 0.555,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.39005,
+      "targetExactRate": 0.9216666666666666,
+      "medianContributions": 160000,
+      "compositions": {
+        "dividend+gold": 553,
+        "gold": 18,
+        "dividend": 29
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "高配当株＋債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 662148,
+      "median": 1643073,
+      "p90": 4032131,
+      "goalRate": 0.19333333333333333,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.4246511254019293,
+      "targetExactRate": 0.9183333333333333,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+dividend": 551,
+        "bonds": 18,
+        "dividend": 31
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "高配当株＋債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1100262,
+      "median": 3503125,
+      "p90": 12754013,
+      "goalRate": 0.555,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.41190167140825035,
+      "targetExactRate": 0.9183333333333333,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+dividend": 551,
+        "bonds": 18,
+        "dividend": 31
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "ゴールド＋債券優先",
+      "cards": false,
+      "n": 600,
+      "p10": 733971,
+      "median": 1679041,
+      "p90": 3902910,
+      "goalRate": 0.19,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.3889085144927536,
+      "targetExactRate": 0.92,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+gold": 552,
+        "gold": 36,
+        "bonds": 12
+      }
+    },
+    {
+      "core": "nasdaq",
+      "preference": "ゴールド＋債券優先",
+      "cards": true,
+      "n": 600,
+      "p10": 1223242,
+      "median": 3475600,
+      "p90": 11400549,
+      "goalRate": 0.565,
+      "bankruptcyRate": 0,
+      "medianDrawdown": -0.3624467316601165,
+      "targetExactRate": 0.92,
+      "medianContributions": 160000,
+      "compositions": {
+        "bonds+gold": 552,
+        "gold": 36,
+        "bonds": 12
+      }
+    }
+  ]
+}

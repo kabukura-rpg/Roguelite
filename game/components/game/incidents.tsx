@@ -2,6 +2,7 @@
 import { ArrowRight, CloudLightning, HeartPulse, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CARDS } from '@/lib/game/cards';
+import { lifeExpense, PORTFOLIO_CONFIG } from '@/lib/game/portfolio';
 import { INCIDENTS } from '@/lib/game/incidents';
 import { totalAssets, type State, type Action } from '@/lib/game/engine';
 
@@ -14,6 +15,9 @@ export function IncidentBoard({
   commit: (action: Action) => unknown;
 }) {
   const event = INCIDENTS.find((e) => e.id === s.currentIncident)!;
+  const required = event.cost
+    ? lifeExpense(event.cost, s.longTermStrategies)
+    : 0;
   const result =
     s.phase === 'incidentResult' ? s.incidentHistory.at(-1)! : null;
   const Icon =
@@ -50,7 +54,7 @@ export function IncidentBoard({
         ? [
             {
               id: 'pay',
-              label: `${yen(event.cost!)}円を支払う`,
+              label: `${yen(required)}円を支払う`,
               hint: '現金から支払い、不足分だけ投資資産を強制売却します。',
             },
           ]
@@ -88,7 +92,7 @@ export function IncidentBoard({
               </b>
             </div>
             {result.rate !== null && (
-              <p>今回の投資先への騰落率：{(result.rate * 100).toFixed(1)}%</p>
+              <p>ポートフォリオへの騰落率：{(result.rate * 100).toFixed(1)}%</p>
             )}
             {result.cost > 0 && (
               <p>
@@ -113,10 +117,12 @@ export function IncidentBoard({
             )}
             {event.kind === 'life' && (
               <p className="incident-note">
-                必要額 {yen(event.cost!)}円 · 手元の現金 {yen(s.cash)}円
-                {event.cost! > totalAssets(s)
-                  ? ' · 支払いで資産が尽きます'
-                  : ''}
+                必要額 {yen(required)}円
+                {required < (event.cost ?? 0)
+                  ? '（生活防衛資金で10%軽減）'
+                  : ''}{' '}
+                · 手元の現金 {yen(s.cash)}円
+                {required > totalAssets(s) ? ' · 支払いで資産が尽きます' : ''}
               </p>
             )}
             <div className="incident-choices">
@@ -158,9 +164,12 @@ export function IncidentBoard({
           >
             {totalAssets(s) <= 0 || s.turn === 20
               ? '成績を見る'
-              : s.turn % 3 === 0
-                ? 'カード報酬へ'
-                : '次の年へ'}
+              : PORTFOLIO_CONFIG.growthYears.includes(s.turn) &&
+                  !s.growthHistory.some((h) => h.turn === s.turn)
+                ? 'ポートフォリオ成長へ'
+                : s.turn % 3 === 0
+                  ? 'カード報酬へ'
+                  : '次の年へ'}
             <ArrowRight />
           </Button>
         ) : (

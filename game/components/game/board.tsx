@@ -47,6 +47,7 @@ import { FORECAST_PATTERNS } from '@/lib/game/forecast';
 import { CARDS, CARD_CONFIG, selectedCard } from '@/lib/game/cards';
 import { totalAssets, type State, type Action } from '@/lib/game/engine';
 import { HandPanel, StrategyCard, DeckList, StrategyOutcome } from './strategy';
+import { PortfolioHUD, GrowthBoard } from './portfolio';
 import { IncidentBoard } from './incidents';
 const yen = (n: number) => Math.round(n).toLocaleString('ja-JP');
 const pct = (n: number) => `${n > 0 ? '+' : ''}${(n * 100).toFixed(1)}%`;
@@ -123,12 +124,7 @@ export function GameHUD({ state: s }: { state: State }) {
       </div>
       <div className="hud-equipment">
         <Equipment style={{ color: ASSETS[s.assetType].color }} />
-        <div>
-          <span>
-            投資先 <small>投資中 {yen(s.investedAssets)}円</small>
-          </span>
-          <strong>{ASSETS[s.assetType].name}</strong>
-        </div>
+        <PortfolioHUD state={s} />
       </div>
       <div className="hud-year">
         <Flag />
@@ -317,8 +313,11 @@ function YearResult({
         <small>円</small>
       </strong>
       <p className="resolved-rate">
-        {ASSETS[h.assetType].name} · 相場 {pct(h.baseReturn)}{' '}
-        <ArrowRight size={15} /> 適用 {pct(h.effectiveReturn)}
+        {h.portfolio && h.portfolio.length > 1
+          ? 'ポートフォリオ'
+          : ASSETS[h.assetType].name}{' '}
+        · 相場 {pct(h.baseReturn)} <ArrowRight size={15} /> 適用{' '}
+        {pct(h.effectiveReturn)}
       </p>
       <div className="result-total-change">
         <span>総資産</span>
@@ -442,7 +441,7 @@ function ShopBoard({
       </Tabs>
       <div className="shop-board-footer">
         <p>
-          現金から優先して支払い、不足分は投資資産から。投資先は最初に選んだままです。
+          現金から優先して支払い、不足分は投資資産から。コアは固定。長期構成は4年ごとの成長で育てます。
           <span>カード購入・削除 合計 {yen(s.shopSpent)}円</span>
         </p>
         <Button
@@ -525,6 +524,9 @@ export function GameBoard({
       )}
       {state.phase === 'turnResult' && (
         <YearResult state={state} commit={commit} />
+      )}
+      {state.phase === 'growth' && (
+        <GrowthBoard state={state} commit={commit} />
       )}
       {state.phase === 'broker' && <ShopBoard state={state} commit={commit} />}
       {state.phase === 'reward' && (

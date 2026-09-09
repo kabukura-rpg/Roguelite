@@ -2722,3 +2722,264 @@ body:has(.game-shell) {
     overflow: visible;
   }
 }
+
+/* Portfolio stays inside the compact HUD; long-term growth has its own card board. */
+.game-hud .hud-equipment {
+  min-width: 0;
+}
+.portfolio-hud-control {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.portfolio-hud-control > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #bca577;
+}
+.portfolio-hud-control > div > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.game-hud .portfolio-hud-control div span {
+  font-size: inherit;
+  color: #e4e8ed;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.portfolio-hud-control b {
+  font-weight: 500;
+  color: #d7c499;
+  white-space: nowrap;
+}
+.portfolio-hud-control:focus-visible {
+  outline: 1px solid #dab77c;
+  outline-offset: 3px;
+}
+.portfolio-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  width: 100%;
+  margin: 22px 0;
+  text-align: left;
+}
+.portfolio-summary h3 {
+  margin-bottom: 12px;
+}
+.portfolio-positions > div,
+.portfolio-return-detail > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  border-bottom: 1px solid #34404e;
+  padding: 8px 0;
+  font-size: 14px;
+}
+.portfolio-positions dt {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.portfolio-positions small {
+  color: #a89a7d;
+  font-size: 10px;
+  min-width: 65px;
+}
+.portfolio-positions dd {
+  color: #dcc697;
+}
+.portfolio-summary p,
+.portfolio-policies span {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #9eabbc;
+}
+.portfolio-policies {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.portfolio-policies strong,
+.portfolio-policies span {
+  display: block;
+}
+.portfolio-policies strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d5dfeb;
+}
+.growth-board {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 12px;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #536071 #131c28;
+}
+.growth-board > * {
+  flex-shrink: 0;
+}
+.growth-swipe-hint {
+  display: none;
+}
+.growth-board > p {
+  text-align: center;
+  color: #9eabbc;
+  font-size: 13px;
+}
+.growth-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  width: min(100%, 900px);
+  padding: 10px 0;
+}
+.game-shell .growth-card.strategy-card {
+  width: 100%;
+  height: auto;
+  min-height: 285px;
+  transform: none;
+  display: flex;
+  gap: 12px;
+  text-align: center;
+  padding: 16px;
+}
+.game-shell .growth-card.strategy-card:hover,
+.game-shell .growth-card.strategy-card:focus-visible {
+  transform: translateY(-6px);
+  border-color: #dab77c;
+  box-shadow: 0 0 24px #dab77c25;
+}
+.game-shell .growth-card.strategy-card h3 {
+  font-size: 18px;
+  min-height: 48px;
+  height: auto;
+  margin: 0;
+}
+.game-shell .growth-card.strategy-card p {
+  font-size: 13px;
+  flex: 1;
+  margin: 0;
+  line-height: 1.6;
+}
+.growth-card .growth-summary {
+  color: var(--card-color);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.growth-card .strategy-top {
+  font-size: 10px;
+}
+.growth-card .strategy-footer {
+  position: static;
+  margin-top: auto;
+  width: 100%;
+}
+.growth-owned {
+  text-align: center;
+  font-size: 12px;
+  color: #95a3b6;
+}
+.growth-owned p {
+  color: #d0bb93;
+  margin: 5px 0;
+}
+@media (max-width: 900px) {
+  .growth-choices {
+    gap: 12px;
+  }
+  .growth-board {
+    padding: 12px;
+  }
+}
+@media (max-width: 680px) {
+  .game-hud .hud-equipment {
+    padding: 2px 8px;
+    gap: 5px;
+  }
+  .portfolio-hud-control > div > div {
+    font-size: 10px;
+    line-height: 1.15;
+    gap: 4px;
+  }
+  .portfolio-hud-control > span {
+    font-size: 9px;
+  }
+  .portfolio-summary {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .growth-board {
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 0;
+  }
+  .growth-board .board-screen-heading h2 {
+    font-size: 18px;
+  }
+  .growth-board .board-screen-heading {
+    justify-content: center;
+  }
+  .growth-board .growth-intro {
+    display: none;
+  }
+  .growth-board .growth-swipe-hint {
+    display: block;
+    font-size: 11px;
+    margin: 0;
+  }
+  .growth-choices {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    scrollbar-color: #536071 #131c28;
+    gap: 12px;
+    padding: 8px 4px;
+  }
+  .game-shell .growth-card.strategy-card {
+    flex: 0 0 82%;
+    scroll-snap-align: center;
+    min-height: 285px;
+    gap: 6px;
+    padding: 12px;
+  }
+  .growth-card .strategy-icon {
+    margin: 4px auto;
+    width: 32px;
+    height: 32px;
+  }
+  .game-shell .growth-card.strategy-card h3 {
+    min-height: 32px;
+    font-size: 16px;
+  }
+  .growth-card .growth-summary {
+    font-size: 12px;
+  }
+  .game-shell .growth-card.strategy-card p {
+    font-size: 12px;
+  }
+  .growth-card .strategy-footer {
+    padding-top: 4px;
+    font-size: 11px;
+  }
+  .growth-owned {
+    font-size: 10px;
+    line-height: 1.5;
+  }
+}

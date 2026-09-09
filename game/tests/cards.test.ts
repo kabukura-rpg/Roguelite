@@ -1,3 +1,4 @@
+import { CORE_ASSETS, isCoreAsset } from '../lib/game/portfolio.ts';
 import { INCIDENTS } from '../lib/game/incidents.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +14,7 @@ import {
   cardSummary,
   type CardId,
 } from '../lib/game/cards.ts';
-import { handleIncident } from './helpers.ts';
+import { handleIncident, handleGrowth } from './helpers.ts';
 import {
   MARKET_EVENTS,
   ASSETS,
@@ -40,7 +41,12 @@ function decisionState(
   eventId = 'crash',
 ) {
   let s = reducer(createGame(), { type: 'START', seed: 100, debug: true });
-  s = reducer(s, { type: 'SELECT_ASSET', assetId });
+  s = reducer(s, {
+    type: 'SELECT_ASSET',
+    assetId: isCoreAsset(assetId) ? assetId : 'allWorld',
+  });
+  // Preserve fixed-return regression fixtures for older single-asset saves.
+  s.assetType = assetId;
   s = reducer(s, { type: 'FORCE_EVENT', eventId });
   if (cardId) {
     if (!s.deck.some((c) => c.cardId === cardId))
@@ -79,6 +85,7 @@ function zones(s: State) {
 function nextDecision(state: State, eventId: string) {
   let s = state;
   if (s.phase === 'turnResult') s = reducer(s, { type: 'NEXT' });
+  if (s.phase === 'growth') s = handleGrowth(s);
   if (s.phase === 'reward') s = reducer(s, { type: 'REWARD', cardId: null });
   if (s.phase === 'broker') s = reducer(s, { type: 'LEAVE_SHOP' });
   s = reducer(s, { type: 'FORCE_EVENT', eventId });
@@ -187,7 +194,10 @@ void test('leverage boosts both directions and never creates debt below -100%', 
   assert.equal(
     totalAssets(settle('leverage', 'nasdaq', 'recovery')),
     200000 +
-      grow(800000, marketRate('nasdaq', 'recovery') * CARD_CONFIG.leverageFactor),
+      grow(
+        800000,
+        marketRate('nasdaq', 'recovery') * CARD_CONFIG.leverageFactor,
+      ),
   );
   const s = settle('leverage', 'nasdaq', 'severe_crash');
   assert.equal(
@@ -258,16 +268,25 @@ void test('dividend includes current year, expires after third payout, and stack
     Math.round(invested * CARD_CONFIG.dividendRate);
   let s = settle('dividend', 'gold', 'strong_up');
   assert.ok(s.history[0].strategyDividend > 0);
-  assert.equal(s.history[0].strategyDividend, payout(s.history[0].investedAfter));
+  assert.equal(
+    s.history[0].strategyDividend,
+    payout(s.history[0].investedAfter),
+  );
   assert.equal(s.dividendTurns, 2);
   s = nextDecision(s, 'strong_up');
   s = settleDecision(s, 'hold');
   assert.equal(s.dividendTurns, 1);
-  assert.equal(s.history[1].strategyDividend, payout(s.history[1].investedAfter));
+  assert.equal(
+    s.history[1].strategyDividend,
+    payout(s.history[1].investedAfter),
+  );
   s = nextDecision(s, 'strong_up');
   s = settleDecision(s, 'hold');
   assert.equal(s.dividendTurns, 0);
-  assert.equal(s.history[2].strategyDividend, payout(s.history[2].investedAfter));
+  assert.equal(
+    s.history[2].strategyDividend,
+    payout(s.history[2].investedAfter),
+  );
   s = nextDecision(s, 'strong_up');
   s = settleDecision(s, 'hold');
   assert.equal(s.history[3].strategyDividend, 0);
@@ -439,10 +458,7 @@ void test('shop sells cards only: no asset switch, purchase once, cash first the
   let s = shopState();
   const asset = s.assetType;
   // The starting asset is the run's build; the shop cannot change it.
-  assert.equal(
-    reducer(s, { type: 'SHOP_ASSET', assetId: 'gold' } as never),
-    s,
-  );
+  assert.equal(reducer(s, { type: 'SHOP_ASSET', assetId: 'gold' } as never), s);
   assert.equal(s.assetType, asset);
   assert.equal(s.cash, 200000);
   s = reducer(s, { type: 'SHOP_BUY', offerId: 'offer-a' });
@@ -525,9 +541,7 @@ void test('100 full runs cover rewards, shopping, removal and card play with con
     let s = reducer(createGame(), { type: 'START', seed });
     s = reducer(s, {
       type: 'SELECT_ASSET',
-      assetId: (Object.keys(ASSETS) as AssetId[])[
-        seed % Object.keys(ASSETS).length
-      ],
+      assetId: CORE_ASSETS[seed % CORE_ASSETS.length],
     });
     let steps = 0;
     while (!['clear', 'gameOver'].includes(s.phase)) {
@@ -544,6 +558,7 @@ void test('100 full runs cover rewards, shopping, removal and card play with con
       } else if (s.phase === 'turnResult') s = reducer(s, { type: 'NEXT' });
       else if (s.phase === 'incident' || s.phase === 'incidentResult')
         s = handleIncident(s);
+      else if (s.phase === 'growth') s = handleGrowth(s);
       else if (s.phase === 'reward')
         s = reducer(s, { type: 'REWARD', cardId: s.rewardChoices[seed % 3] });
       else if (s.phase === 'broker') {

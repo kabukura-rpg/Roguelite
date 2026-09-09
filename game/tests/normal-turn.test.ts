@@ -1,3 +1,4 @@
+import { handleGrowth } from './helpers.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { INCIDENTS } from '../lib/game/incidents.ts';
@@ -145,6 +146,7 @@ void test('100 runs complete through the card-only flow, rewards and shops', () 
         s = reducer(s, { type: 'INCIDENT_NEXT' });
       else if (s.phase === 'reward')
         s = reducer(s, { type: 'REWARD', cardId: s.rewardChoices[0] });
+      else if (s.phase === 'growth') s = handleGrowth(s);
       else if (s.phase === 'broker') s = reducer(s, { type: 'LEAVE_SHOP' });
     }
     if (s.phase === 'clear') {

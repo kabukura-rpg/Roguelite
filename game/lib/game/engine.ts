@@ -1,4 +1,19 @@
 import {
+  createPortfolio,
+  portfolioAllocation,
+  portfolioReturn,
+  portfolioDividend,
+  dividendReinvestment,
+  lifeExpense,
+  drawGrowthChoices,
+  acquireGrowth,
+  isCoreAsset,
+  PORTFOLIO_CONFIG as P,
+  type PortfolioState,
+  type GrowthId,
+  type Allocation,
+} from './portfolio.ts';
+import {
   generateForecast,
   selectActualMarketEvent,
   calculateMarketReturn,
@@ -27,7 +42,6 @@ import {
   type DeckState,
 } from './cards.ts';
 import {
-  ASSETS,
   MARKET_EVENTS,
   GAME_CONFIG as C,
   RANKS,
@@ -44,6 +58,7 @@ export type Phase =
   | 'incident'
   | 'incidentResult'
   | 'reward'
+  | 'growth'
   | 'clear'
   | 'gameOver';
 export type History = {
@@ -72,9 +87,14 @@ export type History = {
   contrarianTriggered: boolean;
   contrarianArmed: boolean;
   shopSpent: number;
+  portfolio?: Allocation[];
+  assetReturns?: Record<AssetId, number>;
+  dividendReinvested?: number;
+  yearStartFunding?: PortfolioState['yearStartFunding'];
 };
 export type State = DeckState &
-  IncidentState & {
+  IncidentState &
+  PortfolioState & {
     phase: Phase;
     turn: number;
     investedAssets: number;
@@ -113,6 +133,7 @@ export type Action =
   | { type: 'RESOLVE' }
   | { type: 'INCIDENT_CHOICE'; choiceId: string }
   | { type: 'INCIDENT_NEXT' }
+  | { type: 'GROWTH'; choiceId: GrowthId }
   | { type: 'NEXT' }
   | { type: 'TITLE' }
   | { type: 'FORCE_EVENT'; eventId: string };
@@ -123,6 +144,7 @@ export function createGame(seed = 1, debug = false): State {
   return {
     ...createDeck(seed),
     ...createIncidents(seed),
+    ...createPortfolio(seed),
     shopSpent: 0,
     phase: 'title',
     turn: 1,
@@ -207,6 +229,20 @@ export function checkGameOver(s: State) {
 export function checkGameClear(s: State) {
   return s.history.length >= C.totalTurns && totalAssets(s) > 0;
 }
+export function applyYearStartFunding(s: State) {
+  if (s.fundedTurn === s.turn) return;
+  const contribution = s.longTermStrategies.includes('contributions')
+    ? P.annualContribution
+    : 0;
+  const invested = contribution ? P.contributionInvested : 0;
+  const cashTopUp = s.cashTopUpPending ? P.cashTopUp : 0;
+  s.investedAssets += invested;
+  s.cash += contribution - invested + cashTopUp;
+  s.cashTopUpPending = false;
+  s.fundedTurn = s.turn;
+  s.yearStartFunding = { contribution, cashTopUp, totalAfter: totalAssets(s) };
+  if (contribution || cashTopUp) updateDrawdown(s);
+}
 export function startTurn(s: State) {
   if (checkGameOver(s)) {
     s.phase = 'gameOver';
@@ -217,6 +253,7 @@ export function startTurn(s: State) {
   s.forcedEventId = null;
   s.shopSpent = 0;
   s.selectedCardId = null;
+  applyYearStartFunding(s);
   applyPanicReentry(s);
   drawHand(s);
   s.turnsSinceBroker++;
@@ -268,7 +305,10 @@ export function applyPanicSell(s: State, r: number) {
   s.panicReentryPending = true;
 }
 export function applyDividend(s: State) {
-  const dividend = money(s.investedAssets * ASSETS[s.assetType].dividendRate);
+  const dividend = portfolioDividend(
+    s.investedAssets,
+    portfolioAllocation(s.assetType, s.satellites),
+  );
   s.cash += dividend;
   return dividend;
 }
@@ -306,7 +346,8 @@ export function applyDecision(
     s.cash += cashReserved;
   }
   if (cardId === 'dividend') s.dividendTurns += K.dividendDuration;
-  const baseReturn = event.returns[s.assetType];
+  const portfolio = portfolioAllocation(s.assetType, s.satellites);
+  const baseReturn = portfolioReturn(portfolio, event.returns);
   // An already armed bonus applies once to the NEXT positive return of the equipped asset.
   const contrarianTriggered = s.contrarianPending && baseReturn > 0;
   let rate = adjustedReturn(baseReturn, cardId, contrarianTriggered);
@@ -329,6 +370,12 @@ export function applyDecision(
   const strategyDividend =
     s.dividendTurns > 0 ? money(s.investedAssets * K.dividendRate) : 0;
   s.cash += strategyDividend;
+  const dividendReinvested = dividendReinvestment(
+    dividend,
+    s.longTermStrategies.includes('reinvestment'),
+  );
+  s.cash -= dividendReinvested;
+  s.investedAssets += dividendReinvested;
   if (s.dividendTurns > 0) s.dividendTurns--;
   const contrarianArmed =
     cardId === 'contrarian' &&
@@ -337,7 +384,7 @@ export function applyDecision(
   if (contrarianArmed) s.contrarianPending = true;
   const drawdown = updateDrawdown(s);
   s.decisionCounts[decision]++;
-  s.assetUsageTurns[s.assetType]++;
+  for (const position of portfolio) s.assetUsageTurns[position.assetId]++;
   if (event.id === 'crash') s.crashCount++;
   if (event.id === 'severe_crash') s.severeCrashCount++;
   s.history.push({
@@ -366,6 +413,10 @@ export function applyDecision(
     contrarianTriggered,
     contrarianArmed,
     shopSpent: s.shopSpent,
+    portfolio,
+    assetReturns: { ...event.returns },
+    dividendReinvested,
+    yearStartFunding: { ...s.yearStartFunding },
   });
   discardHand(s);
   s.previousMarketEvent = event.id;
@@ -377,7 +428,12 @@ export function applyDecision(
 }
 export function cloneState(state: State): State {
   return {
+    ...createPortfolio(state.seed),
     ...state,
+    satellites: [...(state.satellites ?? [])],
+    longTermStrategies: [...(state.longTermStrategies ?? [])],
+    growthChoices: [...(state.growthChoices ?? [])],
+    growthHistory: [...(state.growthHistory ?? [])],
     incidentHistory: [...state.incidentHistory],
     history: [...state.history],
     decisionCounts: { ...state.decisionCounts },
@@ -398,6 +454,16 @@ export function assetHistoryPoints(s: State) {
   const points = [
     { year: 0, total: C.initialTotal, label: '開始' },
     ...s.history.flatMap((h) => [
+      ...(h.yearStartFunding &&
+      h.yearStartFunding.contribution + h.yearStartFunding.cashTopUp > 0
+        ? [
+            {
+              year: h.year - 0.25,
+              total: h.yearStartFunding.totalAfter,
+              label: `${h.year}年目の積立・現金補充`,
+            },
+          ]
+        : []),
       { year: h.year, total: h.totalAfter, label: `${h.year}年目の相場` },
       ...s.incidentHistory
         .filter((e) => e.turn === h.year)
@@ -410,7 +476,11 @@ export function assetHistoryPoints(s: State) {
   ];
   // A shop payment can end a run before the current year's market is settled.
   if (s.phase === 'gameOver' && s.history.at(-1)?.turn !== s.turn)
-    points.push({ year: s.turn, total: totalAssets(s), label: `${s.turn}年目` });
+    points.push({
+      year: s.turn,
+      total: totalAssets(s),
+      label: `${s.turn}年目`,
+    });
   return points;
 }
 export function calculateRank(total: number) {
@@ -480,12 +550,23 @@ function finishYear(s: State) {
   s.currentIncident = null;
   if (checkGameOver(s)) s.phase = 'gameOver';
   else if (s.turn >= C.totalTurns) s.phase = 'clear';
-  else if (s.turn % K.rewardInterval === 0) {
-    s.rewardChoices = randomCardChoices(s);
-    s.phase = 'reward';
+  else if (
+    P.growthYears.includes(s.turn) &&
+    !s.growthHistory.some((h) => h.turn === s.turn)
+  ) {
+    s.growthChoices = drawGrowthChoices(s);
+    s.phase = 'growth';
   } else {
-    s.turn++;
-    startTurn(s);
+    s.cashTopUpPending =
+      s.longTermStrategies.includes('cashManagement') &&
+      s.cash < totalAssets(s) * P.cashThreshold;
+    if (s.turn % K.rewardInterval === 0) {
+      s.rewardChoices = randomCardChoices(s);
+      s.phase = 'reward';
+    } else {
+      s.turn++;
+      startTurn(s);
+    }
   }
 }
 export function resolveIncident(s: State, choiceId: string): boolean {
@@ -512,25 +593,29 @@ export function resolveIncident(s: State, choiceId: string): boolean {
     rate: number | null = null,
     message = '';
   if (event.kind === 'life') {
-    cost = Math.min(totalAssets(s), event.cost!);
+    const required = lifeExpense(event.cost!, s.longTermStrategies);
+    cost = Math.min(totalAssets(s), required);
     forcedSale = Math.max(0, cost - s.cash);
-    payCost(s, event.cost!);
+    payCost(s, required);
     message =
-      cost < event.cost!
+      cost < required
         ? '支払える資産をすべて充てました。資産が尽き、冒険は終了です。'
         : forcedSale
           ? '現金だけでは足りず、不足分の投資資産を強制売却しました。'
           : '手元の現金で支払い、投資資産を売らずに済みました。';
   } else if (event.kind === 'shock') {
     const [low, high] = event.range!;
-    const sensitivity = {
-      allWorld: 0.9,
-      sp500: 1,
-      nasdaq: 1.3,
-      dividend: 0.8,
-      gold: 0.55,
-      bonds: 0.4,
-    }[s.assetType];
+    const sensitivity = portfolioReturn(
+      portfolioAllocation(s.assetType, s.satellites),
+      {
+        allWorld: 0.9,
+        sp500: 1,
+        nasdaq: 1.3,
+        dividend: 0.8,
+        gold: 0.55,
+        bonds: 0.4,
+      },
+    );
     rate =
       Math.round(
         (low + incidentRandom(s) * (high - low)) * sensitivity * 1000,
@@ -608,7 +693,7 @@ export function reducer(state: State, action: Action): State {
   if (
     action.type === 'SELECT_ASSET' &&
     s.phase === 'select' &&
-    Object.hasOwn(ASSETS, action.assetId)
+    isCoreAsset(action.assetId)
   ) {
     s.assetType = action.assetId;
     startTurn(s);
@@ -668,6 +753,15 @@ export function reducer(state: State, action: Action): State {
     applyDecision(s, decision, event, 'strategy');
     // Always show this committed outcome, including a bankruptcy or the final year.
     s.phase = 'turnResult';
+  } else if (action.type === 'GROWTH' && s.phase === 'growth') {
+    if (
+      !s.growthChoices.includes(action.choiceId) ||
+      s.growthHistory.some((h) => h.turn === s.turn) ||
+      !acquireGrowth(s, action.choiceId)
+    )
+      return state;
+    s.growthChoices = [];
+    finishYear(s);
   } else if (action.type === 'NEXT' && s.phase === 'turnResult') {
     if (
       !checkGameOver(s) &&

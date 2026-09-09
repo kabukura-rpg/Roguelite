@@ -1,4 +1,5 @@
-import { handleIncident } from './helpers.ts';
+import { CORE_ASSETS, isCoreAsset } from '../lib/game/portfolio.ts';
+import { handleIncident, handleGrowth } from './helpers.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -40,8 +41,8 @@ const crash = (decision: Decision) => {
   applyDecision(s, decision, event('crash'));
   return s;
 };
-void test('TC01: initial 80/20 allocation and five selectable assets', () => {
-  for (const id of Object.keys(ASSETS) as AssetId[]) {
+void test('TC01: initial 80/20 allocation and three selectable cores', () => {
+  for (const id of CORE_ASSETS) {
     let s = reducer(createGame(), { type: 'START', seed: 1 });
     assert.equal(s.phase, 'select');
     assert.equal(s.investedAssets, 800000);
@@ -99,7 +100,10 @@ void test('TC06 dividend uses remaining year-end investment', () => {
   const left = grown - Math.round(grown * 0.9);
   assert.equal(p.investedAssets, left);
   assert.equal(p.history[0].dividend, Math.round(left * 0.015));
-  assert.equal(p.cash, 200000 + Math.round(grown * 0.9) + p.history[0].dividend);
+  assert.equal(
+    p.cash,
+    200000 + Math.round(grown * 0.9) + p.history[0].dividend,
+  );
 });
 void test('no asset dominates: every rating trio is a trade-off', () => {
   const ids = Object.keys(ASSETS) as AssetId[];
@@ -156,7 +160,12 @@ function play(
   decision: Decision = 'hold',
 ) {
   let s = reducer(createGame(), { type: 'START', seed });
-  s = reducer(s, { type: 'SELECT_ASSET', assetId });
+  s = reducer(s, {
+    type: 'SELECT_ASSET',
+    assetId: isCoreAsset(assetId) ? assetId : 'allWorld',
+  });
+  // Preserve fixed-return regression fixtures for older single-asset saves.
+  s.assetType = assetId;
   let guard = 0;
   while (!['clear', 'gameOver'].includes(s.phase)) {
     assert.ok(++guard < 100);
@@ -165,6 +174,7 @@ function play(
     else if (s.phase === 'incident' || s.phase === 'incidentResult')
       s = handleIncident(s, decision);
     else if (s.phase === 'turnResult') s = reducer(s, { type: 'NEXT' });
+    else if (s.phase === 'growth') s = handleGrowth(s);
     else if (s.phase === 'reward')
       s = reducer(s, { type: 'REWARD', cardId: null });
   }
