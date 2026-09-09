@@ -18,7 +18,7 @@ export const CARDS = {
     category: '守備',
     icon: 'shield',
     color: '#91b9ed',
-    summary: 'マイナスリターンを30%軽減',
+    summary: '下落を30%軽減',
     description: 'この年のマイナスリターンを30%軽減。プラス相場では効果なし。',
     price: 50_000,
   },
@@ -27,7 +27,7 @@ export const CARDS = {
     category: '守備',
     icon: 'scissors',
     color: '#91b9ed',
-    summary: '下落を最大 −25%に制限',
+    summary: '最大損失 −25%',
     description:
       'この年の投資先のマイナスリターンを−25%までに制限。現金や手数料は対象外。',
     price: 60_000,
@@ -37,7 +37,7 @@ export const CARDS = {
     category: '攻勢',
     icon: 'zap',
     color: '#eda391',
-    summary: '利益も損失も1.8倍',
+    summary: '利益・損失 ×1.8',
     description:
       'この年の相場リターンを1.8倍。大きな利益にも、大きな損失にも。',
     price: 70_000,
@@ -47,7 +47,7 @@ export const CARDS = {
     category: '継続',
     icon: 'coins',
     color: '#87cdb4',
-    summary: '3年間、投資資産の1%を獲得',
+    summary: '配当1% × 3年',
     description:
       '使用年を含む3年間、年末の投資資産の1%を現金で獲得。再使用は期間を3年延長。',
     price: 60_000,
@@ -57,9 +57,8 @@ export const CARDS = {
     category: '準備',
     icon: 'wallet',
     color: '#dab77c',
-    summary: '相場の前に20%を現金化',
-    description:
-      '基本コマンドと相場リターンの前に、投資資産の20%を現金に移す。',
+    summary: '投資額20%を現金化',
+    description: '相場リターンの前に、投資資産の20%を現金に移す。',
     price: 40_000,
   },
   dollarCost: {
@@ -67,9 +66,9 @@ export const CARDS = {
     category: '攻勢',
     icon: 'layers',
     color: '#eda391',
-    summary: '買い増し時、現金の75%を投入',
+    summary: '現金75%を投入',
     description:
-      'この年の買い増しを現金50%から75%に変更。他の基本コマンドでは効果なし。',
+      'このカードだけで、相場リターンの前に現金の75%を追加投資する。現金がなくても使用できる。',
     price: 50_000,
   },
   rebalance: {
@@ -77,7 +76,7 @@ export const CARDS = {
     category: '装備',
     icon: 'refresh',
     color: '#baa5ed',
-    summary: '相場の前に投資先を変更',
+    summary: '投資先を変更',
     description:
       'この年だけショップの外で投資先を変更。手数料は総資産の1%・最低5,000円。',
     price: 60_000,
@@ -87,9 +86,9 @@ export const CARDS = {
     category: '布石',
     icon: 'crosshair',
     color: '#baa5ed',
-    summary: '暴落で買い増し → 次の上昇1.3倍',
+    summary: '現金50%投入・逆張り',
     description:
-      '暴落・歴史的大暴落で買い増しすると、次に保有資産がプラスになる相場を1.3倍。倍率は重複しない。',
+      '相場の前に現金50%を追加投資。暴落・歴史的大暴落なら、次に保有資産がプラスになる相場を1.3倍。倍率は重複しない。',
     price: 70_000,
   },
 } as const;
@@ -109,7 +108,7 @@ export const INITIAL_DECK: CardId[] = [
 export type CardInstance = { id: string; cardId: CardId };
 export type Acquisition = {
   cardId: CardId;
-  source: 'reward' | 'shop';
+  source: 'reward' | 'shop' | 'incident';
   turn: number;
 };
 export type DeckState = {

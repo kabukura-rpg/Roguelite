@@ -4,7 +4,7 @@ import './board.css';
 export const metadata: Metadata = {
   title: '株クラ｜20年の相場を生き抜く',
   description:
-    '100万円から始まる、ポートフォリオ構築型ローグライト。5つの装備、8つの戦略カードと3つの基本コマンドで、20年間の相場を攻略しよう。',
+    '100万円から始まる、ポートフォリオ構築型ローグライト。5つの装備、8つの戦略カードで、20年間の相場を攻略しよう。',
   icons: { icon: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/favicon.svg` },
 };
 export default function RootLayout({

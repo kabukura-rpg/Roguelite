@@ -1,5 +1,6 @@
 export const GAME_CONFIG = {
   totalTurns: 20,
+  targetAssets: 3_000_000,
   initialTotal: 1_000_000,
   initialInvested: 800_000,
   initialCash: 200_000,

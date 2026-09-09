@@ -19,9 +19,6 @@ import {
   BookOpen,
   History as HistoryIcon,
   ArrowRight,
-  Hand,
-  LogOut,
-  Plus,
   Eye,
   Clock,
   Crosshair,
@@ -44,17 +41,16 @@ import {
   DECISIONS,
   GAME_CONFIG,
   type AssetId,
-  type Decision,
 } from '@/lib/game/data';
 import { CARDS, CARD_CONFIG, selectedCard } from '@/lib/game/cards';
 import {
   totalAssets,
   brokerFee,
-  previewDecision,
   type State,
   type Action,
 } from '@/lib/game/engine';
 import { HandPanel, StrategyCard, DeckList, StrategyOutcome } from './strategy';
+import { IncidentBoard } from './incidents';
 const yen = (n: number) => Math.round(n).toLocaleString('ja-JP');
 const pct = (n: number) => `${n > 0 ? '+' : ''}${(n * 100).toFixed(1)}%`;
 const equipmentIcons = {
@@ -66,18 +62,34 @@ const equipmentIcons = {
 };
 export function GameHUD({ state: s }: { state: State }) {
   const Equipment = equipmentIcons[s.assetType];
+  const goalProgress = Math.min(
+    GAME_CONFIG.targetAssets,
+    Math.max(0, totalAssets(s)),
+  );
+  const goalPercent = Math.round(
+    (goalProgress / GAME_CONFIG.targetAssets) * 100,
+  );
   return (
     <header className="game-hud" aria-label="ゲームのステータス">
       <div className="hud-total">
         <Coins />
         <div>
-          <span>
-            総資産 <small>HP / SCORE</small>
-          </span>
+          <span>総資産</span>
           <strong>
             {yen(totalAssets(s))}
             <small> 円</small>
           </strong>
+          <div className="hud-goal">
+            <div>
+              <span>目標 {yen(GAME_CONFIG.targetAssets)}円</span>
+              <small>{goalPercent}%</small>
+            </div>
+            <progress
+              aria-label="目標資産への進捗"
+              max={GAME_CONFIG.targetAssets}
+              value={goalProgress}
+            />
+          </div>
         </div>
       </div>
       <div>
@@ -158,6 +170,8 @@ export function GameTools({
 function Effects({ state: s }: { state: State }) {
   return (
     <div className="arena-effects">
+      {s.nextLossShield && <span>冷静な判断 · 次の通常相場の下落半減</span>}
+      {s.forecastInsight && <span>次の予報を詳しく確認</span>}
       {s.dividendTurns > 0 && (
         <span>
           <Clock size={13} />
@@ -182,8 +196,8 @@ function Encounter({
 }) {
   const e = MARKET_EVENTS.find((e) => e.id === s.eventId)!;
   const revealed = s.phase === 'decision';
-  const preview = revealed ? previewDecision(s, 'hold') : null;
-  const impact = preview?.effectiveReturn ?? 0;
+  const risk =
+    e.forecast.find(([label]) => label === 'リスク')?.[1] ?? '変動に注意';
   const Icon = !revealed
     ? CloudFog
     : e.category === '暴落'
@@ -192,7 +206,7 @@ function Encounter({
         ? Flame
         : e.id === 'rate_hike' || e.id === 'inflation'
           ? Wind
-          : impact >= 0
+          : e.category !== '下落'
             ? TrendingUp
             : TrendingDown;
   const notes = [
@@ -202,7 +216,7 @@ function Encounter({
   ].filter(Boolean);
   return (
     <section
-      className={`battle-arena ${!revealed ? 'is-forecast' : impact < 0 ? 'is-hostile' : 'is-favorable'}`}
+      className={`battle-arena ${!revealed ? 'is-forecast' : 'is-uncertain'}`}
       aria-label={revealed ? '相場との対峙' : '市場予報'}
     >
       <div className="arena-topline">
@@ -230,22 +244,27 @@ function Encounter({
                   <strong>{v}</strong>
                 </div>
               ))}
+              {s.forecastInsight &&
+                Object.values(ASSETS).map((asset) => (
+                  <div key={asset.id}>
+                    <span>{asset.name}</span>
+                    <strong>
+                      {e.returns[asset.id] > 0
+                        ? '上向きの見通し'
+                        : e.returns[asset.id] < 0
+                          ? '下向きの見通し'
+                          : '横ばいの見通し'}
+                    </strong>
+                  </div>
+                ))}
             </div>
           )}
         </div>
         {revealed ? (
-          <div
-            className={`enemy-intent ${impact >= 0 ? 'positive' : 'negative'}`}
-          >
-            <span>
-              {ASSETS[preview?.assetType ?? s.assetType].name}への影響
-            </span>
-            <strong>{pct(impact)}</strong>
-            {preview && preview.baseReturn !== impact ? (
-              <small>戦略適用前 {pct(preview.baseReturn)}</small>
-            ) : (
-              <small>投資資産に適用</small>
-            )}
+          <div className="enemy-intent uncertain-intent">
+            <span>市場リスク</span>
+            <strong>{risk}</strong>
+            <small>騰落率は結果で判明</small>
           </div>
         ) : (
           <Button
@@ -258,7 +277,7 @@ function Encounter({
       </div>
       <div className="arena-bottomline">
         {revealed ? (
-          <span>戦略を0〜1枚選び、基本コマンドで迎え撃とう。</span>
+          <span>戦略を0〜1枚選択。結果を見届けよう。</span>
         ) : notes.length ? (
           <span>{notes.join(' / ')}</span>
         ) : (
@@ -268,7 +287,7 @@ function Encounter({
     </section>
   );
 }
-function CommandTray({
+function StrategyCommit({
   state: s,
   commit,
 }: {
@@ -277,65 +296,30 @@ function CommandTray({
 }) {
   const ready = s.phase === 'decision';
   const selected = selectedCard(s);
-  const commands = [
-    {
-      id: 'panic' as Decision,
-      Icon: LogOut,
-      short: '相場の後に90%を現金化',
-      detail:
-        '相場リターンを受けた後に投資資産の90%を現金化。翌年、現金30%を自動再投資。',
-      tone: 'sell',
-    },
-    {
-      id: 'hold' as Decision,
-      Icon: Hand,
-      short: 'そのまま保有',
-      detail: '現在の投資額のまま相場リターンを受ける。',
-      tone: 'hold',
-    },
-    {
-      id: 'buyMore' as Decision,
-      Icon: Plus,
-      short: `現金${selected?.cardId === 'dollarCost' ? 75 : 50}%を追加`,
-      detail: '現金の一部を追加投資してから相場リターンを受ける。',
-      tone: 'buy',
-    },
-  ];
   return (
-    <section className="command-tray" aria-label="基本コマンド">
-      <div className="command-tray-label">
-        <span>COMMAND</span>
-        <small>{ready ? '選んで年を進める' : '相場公開後に選択'}</small>
-      </div>
-      <div className="command-buttons">
-        {commands.map(({ id, Icon, short, detail, tone }) => {
-          const preview = ready ? previewDecision(s, id) : null;
-          return (
-            <button
-              type="button"
-              key={id}
-              className={`battle-command ${tone}`}
-              disabled={!ready}
-              onClick={() => commit({ type: 'DECIDE', decision: id })}
-              aria-label={`${DECISIONS[id]}。${detail}${preview ? ` 予想総資産 ${yen(preview.totalAfter)}円。` : ''}`}
-            >
-              <span className="command-name">
-                <Icon size={20} />
-                <strong>{DECISIONS[id]}</strong>
-                <ArrowRight size={14} />
-              </span>
-              <span className="command-short">{short}</span>
-              {preview && (
-                <span className="command-value">
-                  <small>予想</small>
-                  {yen(preview.totalAfter)}
-                  <small>円</small>
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+    <section className="strategy-commit" aria-label="戦略を確定">
+      <span className="eyebrow gold">RESOLVE</span>
+      <strong>
+        {selected ? CARDS[selected.cardId].name : 'カードを使わない'}
+      </strong>
+      <p>
+        {selected
+          ? CARDS[selected.cardId].summary
+          : 'カードを使わずに相場へ進みます'}
+      </p>
+      <Button
+        className="primary"
+        disabled={!ready}
+        onClick={() => commit({ type: 'RESOLVE' })}
+      >
+        {ready
+          ? selected
+            ? 'カードを使う'
+            : 'このまま進む'
+          : '相場公開を待つ'}{' '}
+        <ArrowRight />
+      </Button>
+      <small>確定するまで選び直せます</small>
     </section>
   );
 }
@@ -351,20 +335,18 @@ function YearResult({
   const event = MARKET_EVENTS.find((e) => e.id === h.marketEvent)!;
   const delta = h.totalAfter - h.investedBefore - h.cashBefore;
   const positive = delta >= 0;
-  const needsReward = s.turn % CARD_CONFIG.rewardInterval === 0;
   return (
     <section className="year-result-board">
       <span className="eyebrow gold">
-        YEAR {String(s.turn).padStart(2, '0')} / ENCOUNTER RESOLVED
+        RESULT · YEAR {String(s.turn).padStart(2, '0')}
       </span>
       <div className={`result-insignia ${positive ? 'positive' : 'negative'}`}>
         {positive ? <TrendingUp /> : <TrendingDown />}
       </div>
-      <h2>{event.name}を乗り越えた。</h2>
+      <h2>{event.name}</h2>
       <div className="resolved-combo">
-        <span>{h.cardId ? CARDS[h.cardId].name : 'カードなし'}</span>
-        <b>＋</b>
-        <span>{DECISIONS[h.decision]}</span>
+        <span>使用戦略 · {h.cardId ? CARDS[h.cardId].name : 'カードなし'}</span>
+        {h.resolution === 'event' && <span>{DECISIONS[h.decision]}</span>}
       </div>
       <strong
         className={`resolved-delta ${positive ? 'positive' : 'negative'}`}
@@ -374,9 +356,16 @@ function YearResult({
         <small>円</small>
       </strong>
       <p className="resolved-rate">
-        相場 {pct(h.baseReturn)} <ArrowRight size={15} /> 適用{' '}
-        {pct(h.effectiveReturn)}
+        {ASSETS[h.assetType].name} · 相場 {pct(h.baseReturn)}{' '}
+        <ArrowRight size={15} /> 適用 {pct(h.effectiveReturn)}
       </p>
+      <div className="result-total-change">
+        <span>総資産</span>
+        <strong>
+          {yen(h.investedBefore + h.cashBefore)}円 <ArrowRight size={16} />{' '}
+          {yen(h.totalAfter)}円
+        </strong>
+      </div>
       <div className="resolved-balances">
         <span>
           投資 <b>{yen(h.investedAfter)}円</b>
@@ -402,15 +391,15 @@ function YearResult({
           <Info /> 計算の詳細
         </Button>
         <Button className="primary" onClick={() => commit({ type: 'NEXT' })}>
-          {needsReward ? '戦略カードの報酬へ' : '次の年へ'}
+          年末の出来事を確認
           <ArrowRight />
         </Button>
       </div>
       <Dialog open={details} onOpenChange={setDetails}>
         <DialogContent className="history-dialog outcome-dialog">
-          <DialogTitle>{s.turn}年目の決算</DialogTitle>
+          <DialogTitle>{s.turn}年目の結果</DialogTitle>
           <DialogDescription>
-            使用戦略と基本コマンドによる変化。
+            使用戦略と相場による資産の変化。
           </DialogDescription>
           <StrategyOutcome entry={h} />
           <div className="settlement">
@@ -607,6 +596,9 @@ export function GameBoard({
 }) {
   return (
     <div className={`board-content board-phase-${state.phase}`}>
+      {(state.phase === 'incident' || state.phase === 'incidentResult') && (
+        <IncidentBoard state={state} commit={commit} />
+      )}
       {(state.phase === 'forecast' || state.phase === 'decision') && (
         <div className="battle-board">
           <Encounter state={state} commit={commit} />
@@ -617,7 +609,7 @@ export function GameBoard({
               disabled={state.phase !== 'decision'}
               compact
             />
-            <CommandTray state={state} commit={commit} />
+            <StrategyCommit state={state} commit={commit} />
           </div>
         </div>
       )}

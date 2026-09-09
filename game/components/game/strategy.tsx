@@ -73,6 +73,7 @@ export function StrategyCard({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
+      title={card.description}
       aria-label={`${card.name}：${card.description} ${footer}`}
       style={{ '--card-color': card.color } as CSSProperties}
     >
@@ -185,7 +186,7 @@ export function HandPanel({
         })}
       </div>
       {state.hand.length === 0 && (
-        <p className="empty-note">手札なし · 基本コマンドで進めます。</p>
+        <p className="empty-note">手札なし · カードを使わずに進めます。</p>
       )}
       <div className={`hand-selection ${selected ? 'has-strategy' : ''}`}>
         {selected ? (
@@ -202,7 +203,7 @@ export function HandPanel({
                 </Button>
               )}
               <Button variant="ghost" onClick={() => setDetailsOpen(true)}>
-                効果
+                詳細
               </Button>
               <Button
                 variant="ghost"
@@ -220,7 +221,7 @@ export function HandPanel({
           <span>
             {disabled
               ? '相場の気配を読み、手札を確かめよう。'
-              : 'カードを使わず、基本コマンドだけでも進めます。'}
+              : 'カードを使わずに相場へ進みます'}
           </span>
         )}
       </div>
@@ -232,7 +233,7 @@ export function HandPanel({
           <DialogDescription>
             {selected ? CARDS[selected.cardId].description : ''}
           </DialogDescription>
-          <p>基本コマンドを確定するまで選び直せます。</p>
+          <p>進行を確定するまで選び直せます。</p>
         </DialogContent>
       </Dialog>
       <Dialog
@@ -243,7 +244,7 @@ export function HandPanel({
           <DialogTitle>リバランス · 装備を選ぶ</DialogTitle>
           <DialogDescription>
             変更手数料 {yen(brokerFee(state))}
-            円。基本コマンド確定時に支払い、装備を変更します。
+            円。進行確定時に支払い、装備を変更します。
           </DialogDescription>
           <div className="rebalance-options">
             {Object.values(ASSETS).map((a) => (
@@ -285,7 +286,7 @@ export function DeckList({
   return (
     <div className="deck-list">
       {state.deck.length === 0 ? (
-        <p>デッキは空です。基本コマンドは引き続き使えます。</p>
+        <p>デッキは空です。カードを使わずに進めます。</p>
       ) : (
         state.deck.map((instance, i) => {
           const card = CARDS[instance.cardId],
@@ -422,7 +423,11 @@ export function StrategyOutcome({ entry }: { entry: History }) {
           {entry.cardId ? CARDS[entry.cardId].name : 'カード使用なし'}
         </span>
         <b>＋</b>
-        <span>{DECISIONS[entry.decision]}</span>
+        <span>
+          {entry.resolution === 'strategy'
+            ? '戦略による結果'
+            : DECISIONS[entry.decision]}
+        </span>
       </div>
       <div className="outcome-rate">
         <span>{ASSETS[entry.assetType].name}の相場リターン</span>
@@ -512,7 +517,7 @@ export function CardResult({ state }: { state: State }) {
               return records.length ? (
                 <span
                   key={id}
-                  title={`報酬${records.filter((r) => r.source === 'reward').length}枚・購入${records.filter((r) => r.source === 'shop').length}枚`}
+                  title={`報酬${records.filter((r) => r.source === 'reward').length}枚・購入${records.filter((r) => r.source === 'shop').length}枚・突発${records.filter((r) => r.source === 'incident').length}枚`}
                 >
                   {CARDS[id].name} ×{records.length}
                 </span>

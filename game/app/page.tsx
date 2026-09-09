@@ -15,6 +15,8 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { GameBoard, GameHUD, GameTools } from '@/components/game/board';
+import { IncidentLog } from '@/components/game/incidents';
+import { INCIDENTS } from '@/lib/game/incidents';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -42,7 +44,6 @@ import {
   DECISIONS,
   GAME_CONFIG as C,
   type AssetId,
-  type Decision,
 } from '@/lib/game/data';
 import {
   createGame,
@@ -246,7 +247,9 @@ function HistoryTable({ state }: { state: State }) {
               {MARKET_EVENTS.find((e) => e.id === h.marketEvent)?.name}
             </TableCell>
             <TableCell>{h.cardId ? CARDS[h.cardId].name : 'なし'}</TableCell>
-            <TableCell>{DECISIONS[h.decision]}</TableCell>
+            <TableCell>
+              {h.resolution === 'strategy' ? '使用戦略' : DECISIONS[h.decision]}
+            </TableCell>
             <TableCell>
               {pct(h.baseReturn)} → {pct(h.effectiveReturn)}
             </TableCell>
@@ -314,7 +317,39 @@ export default function Home() {
     const controller = new AbortController();
     const snapshot = () => {
       const s = stateRef.current;
+      const incident =
+        s.phase === 'incident'
+          ? INCIDENTS.find((e) => e.id === s.currentIncident)
+          : undefined;
       return {
+        incident: incident
+          ? {
+              id: incident.id,
+              kind: incident.kind,
+              name: incident.name,
+              description: incident.description,
+              cost: incident.cost,
+              choices:
+                incident.choices ??
+                (incident.kind === 'life'
+                  ? ['pay']
+                  : ['panic', 'hold', 'buyMore']),
+            }
+          : undefined,
+        incidentResult:
+          s.phase === 'incidentResult' ? s.incidentHistory.at(-1) : undefined,
+        nextLossShield: s.nextLossShield,
+        detailedForecast:
+          s.phase === 'forecast' && s.forecastInsight
+            ? Object.fromEntries(
+                Object.entries(
+                  MARKET_EVENTS.find((e) => e.id === s.eventId)!.returns,
+                ).map(([id, rate]) => [
+                  id,
+                  rate > 0 ? '上向き' : rate < 0 ? '下向き' : '横ばい',
+                ]),
+              )
+            : undefined,
         phase: s.phase,
         year: s.turn,
         asset: s.assetType,
@@ -361,7 +396,7 @@ export default function Home() {
       {
         name: 'play_kabukura_action',
         description:
-          '画面と同じ操作で進める。select_cardで手札のinstanceId（nullで解除）、rebalance_targetで装備を選択しdecideで確定。rewardはcardId（nullでスキップ）。ショップはshop_asset、shop_buy、shop_remove、leave_shop。',
+          '画面と同じ操作で進める。select_cardで手札のinstanceId（nullで解除）、rebalance_targetで装備を選択しresolveで進行確定。rewardはcardId（nullでスキップ）。ショップはshop_asset、shop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。',
         inputSchema: {
           type: 'object',
           properties: {
@@ -372,7 +407,9 @@ export default function Home() {
                 'select_asset',
                 'broker',
                 'reveal',
-                'decide',
+                'resolve',
+                'incident_choice',
+                'incident_next',
                 'next',
                 'select_card',
                 'rebalance_target',
@@ -384,13 +421,13 @@ export default function Home() {
               ],
             },
             assetId: { type: 'string', enum: Object.keys(ASSETS) },
-            decision: { type: 'string', enum: Object.keys(DECISIONS) },
             instanceId: { type: ['string', 'null'] },
             cardId: {
               type: ['string', 'null'],
               enum: [...Object.keys(CARDS), null],
             },
             offerId: { type: 'string' },
+            choiceId: { type: 'string' },
           },
           required: ['action'],
           additionalProperties: false,
@@ -413,11 +450,13 @@ export default function Home() {
               assetId: v.assetId as AssetId,
             };
           else if (
-            v.action === 'decide' &&
-            typeof v.decision === 'string' &&
-            Object.hasOwn(DECISIONS, v.decision)
+            v.action === 'incident_choice' &&
+            typeof v.choiceId === 'string'
           )
-            action = { type: 'DECIDE', decision: v.decision as Decision };
+            action = { type: 'INCIDENT_CHOICE', choiceId: v.choiceId };
+          else if (v.action === 'incident_next')
+            action = { type: 'INCIDENT_NEXT' };
+          else if (v.action === 'resolve') action = { type: 'RESOLVE' };
           else if (v.action === 'reveal') action = { type: 'REVEAL' };
           else if (v.action === 'next') action = { type: 'NEXT' };
           else if (
@@ -608,10 +647,13 @@ export default function Home() {
                     <small>うち歴史的大暴落 {s.severeCrashCount}回</small>
                   </div>
                   <div>
-                    <span>狼狽売り / ホールド / 買い増し</span>
+                    <span>カードを使わず進行</span>
                     <strong>
-                      {s.decisionCounts.panic} / {s.decisionCounts.hold} /{' '}
-                      {s.decisionCounts.buyMore}
+                      {
+                        s.history.filter(
+                          (h) => h.resolution === 'strategy' && !h.cardId,
+                        ).length
+                      }
                       <small> 回</small>
                     </strong>
                   </div>
@@ -624,6 +666,7 @@ export default function Home() {
                   </p>
                 )}
                 <CardResult state={s} />
+                <IncidentLog state={s} />
                 {last && (
                   <div className="final-strategy-detail">
                     <span className="label">最後に記録された相場と戦略</span>
@@ -634,7 +677,11 @@ export default function Home() {
                   <p className="last-year-note">
                     {last.year}年目：
                     {MARKET_EVENTS.find((e) => e.id === last.marketEvent)?.name}
-                    を{DECISIONS[last.decision]}。
+                    を
+                    {last.resolution === 'strategy'
+                      ? '戦略で対応'
+                      : DECISIONS[last.decision]}
+                    。
                     {last.dividend + last.strategyDividend > 0
                       ? `配当 ${yen(last.dividend + last.strategyDividend)}円。`
                       : ''}
@@ -726,7 +773,7 @@ export default function Home() {
         <DialogContent className="help-dialog">
           <DialogTitle>冒険の手引き</DialogTitle>
           <DialogDescription>
-            戦略カード × 基本コマンドで、20年間を生き抜こう。
+            戦略カードで相場に挑み、20年間を生き抜こう。
           </DialogDescription>
           <ol className="help-list">
             <li>
@@ -738,19 +785,25 @@ export default function Home() {
             <li>
               <strong>予報を読み、相場を見る</strong>
               <p>
-                市場予報は傾向のヒント。相場を公開すると、保有資産へのリターンが分かります。
+                市場予報は傾向のヒント。相場公開後も騰落率や予想資産は表示されません。実際の騰落率は、進行後のRESULTで初めて分かります。
               </p>
             </li>
             <li>
               <strong>手札から戦略を0〜1枚選ぶ</strong>
               <p>
-                初期デッキは10枚。毎年5枚を引き、戦略カードを1枚まで使用できます。選択・解除・選び直しは基本コマンド確定まで自由。未使用を含む手札は年末に捨て、山札が尽きたら捨て札をシャッフルします。
+                初期デッキは10枚。毎年5枚を引き、戦略カードを1枚まで使用できます。選択・解除・選び直しは進行確定まで自由。未使用を含む手札は年末に捨て、山札が尽きたら捨て札をシャッフルします。
               </p>
             </li>
             <li>
-              <strong>3つの基本コマンドから選ぶ</strong>
+              <strong>戦略を確定して、結果を見る</strong>
               <p>
-                ホールドはそのまま保有。買い増しは現金50%を投資してから相場を受けます。狼狽売りは相場を受けた後に90%を現金化し、翌年に現金30%を再投資します。
+                選んだカードを使うか、カードを使わずに進みます。ドルコスト平均法は現金75%、逆張りは現金50%を追加投資。現金確保は投資額20%を現金化します。カードなしなら現在の配分を維持します。
+              </p>
+            </li>
+            <li>
+              <strong>年末の突発イベントを乗り越える</strong>
+              <p>
+                通常相場の処理後、発生可能な年は30%で突発イベント。連続年には発生せず、20年完走なら最低4回、同じ出来事は一度だけです。市場ショックだけは狼狽売り・ホールド・買い増しから選び、騰落率は選択後に判明します。生活トラブルは現金優先で支払い、不足分を強制売却。日常の選択では現金・カード・次回の詳細予報・次の通常相場の下落半減を得られます。任意の参加費は現金が必要です。継続効果は重複せず、最終年には次の通常相場がありません。
               </p>
             </li>
             <li>
@@ -790,6 +843,7 @@ export default function Home() {
             <span>初期資産比 {pct(total / C.initialTotal - 1)}</span>
           </div>
           <HistoryTable state={s} />
+          <IncidentLog state={s} />
         </DialogContent>
       </Dialog>
       <Dialog open={deckOpen} onOpenChange={setDeckOpen}>
