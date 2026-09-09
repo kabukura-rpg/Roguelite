@@ -61,7 +61,6 @@ export type History = {
   totalAfter: number;
   drawdown: number;
   dividend: number;
-  brokerFee: number;
   reentry: number;
   additional: number;
   cardId: CardId | null;
@@ -72,7 +71,6 @@ export type History = {
   cashReserved: number;
   contrarianTriggered: boolean;
   contrarianArmed: boolean;
-  cardRebalanceFee: number;
   shopSpent: number;
 };
 export type State = DeckState &
@@ -86,7 +84,6 @@ export type State = DeckState &
     maxDrawdown: number;
     previousMarketEvent: string | null;
     panicReentryPending: boolean;
-    panicPenalty: boolean;
     turnsSinceBroker: number;
     history: History[];
     decisionCounts: Record<Decision, number>;
@@ -101,20 +98,15 @@ export type State = DeckState &
     marketRng: number;
     forcedEventId: string | null;
     reentry: number;
-    brokerFee: number;
     brokerVisits: number[];
     debug: boolean;
-    rebalanceTarget: AssetId | null;
     shopSpent: number;
   };
 export type Action =
   | { type: 'START'; seed: number; debug?: boolean }
   | { type: 'SELECT_ASSET'; assetId: AssetId }
-  | { type: 'BROKER'; assetId: AssetId }
   | { type: 'SELECT_CARD'; instanceId: string | null }
-  | { type: 'REBALANCE_TARGET'; assetId: AssetId }
   | { type: 'REWARD'; cardId: CardId | null }
-  | { type: 'SHOP_ASSET'; assetId: AssetId }
   | { type: 'SHOP_BUY'; offerId: string }
   | { type: 'SHOP_REMOVE'; instanceId: string }
   | { type: 'LEAVE_SHOP' }
@@ -131,24 +123,29 @@ export function createGame(seed = 1, debug = false): State {
   return {
     ...createDeck(seed),
     ...createIncidents(seed),
-    rebalanceTarget: null,
     shopSpent: 0,
     phase: 'title',
     turn: 1,
     investedAssets: C.initialInvested,
     cash: C.initialCash,
-    assetType: 'sp500',
+    assetType: 'allWorld',
     peakAssets: C.initialTotal,
     maxDrawdown: 0,
     previousMarketEvent: null,
     panicReentryPending: false,
-    panicPenalty: false,
     turnsSinceBroker: 0,
     history: [],
     decisionCounts: { panic: 0, hold: 0, buyMore: 0 },
     crashCount: 0,
     severeCrashCount: 0,
-    assetUsageTurns: { sp500: 0, nasdaq: 0, dividend: 0, gold: 0, bonds: 0 },
+    assetUsageTurns: {
+      allWorld: 0,
+      sp500: 0,
+      nasdaq: 0,
+      dividend: 0,
+      gold: 0,
+      bonds: 0,
+    },
     seed: seed >>> 0,
     rng: seed >>> 0,
     eventId: null,
@@ -157,7 +154,6 @@ export function createGame(seed = 1, debug = false): State {
     marketRng: (seed ^ 0x52e9143f) >>> 0,
     forcedEventId: null,
     reentry: 0,
-    brokerFee: 0,
     brokerVisits: [],
     debug,
   };
@@ -219,9 +215,7 @@ export function startTurn(s: State) {
   s.eventId = null;
   s.forecast = null;
   s.forcedEventId = null;
-  s.brokerFee = 0;
   s.shopSpent = 0;
-  s.rebalanceTarget = null;
   s.selectedCardId = null;
   applyPanicReentry(s);
   drawHand(s);
@@ -243,9 +237,6 @@ export function startTurn(s: State) {
     }));
   } else showForecast(s);
 }
-export function brokerFee(s: State) {
-  return Math.max(C.brokerMinimumFee, money(totalAssets(s) * C.brokerFeeRate));
-}
 // All shop payments use cash first, then invested assets; no debt is created.
 export function payCost(s: State, cost: number) {
   const paid = Math.min(totalAssets(s), cost);
@@ -255,17 +246,6 @@ export function payCost(s: State, cost: number) {
   updateDrawdown(s);
   if (checkGameOver(s)) s.phase = 'gameOver';
   return paid;
-}
-export function changeAsset(s: State, assetId: AssetId, leave = true) {
-  if (s.assetType !== assetId) {
-    s.brokerFee += payCost(s, brokerFee(s));
-    s.assetType = assetId;
-  }
-  if (checkGameOver(s)) s.phase = 'gameOver';
-  else if (leave) {
-    drawHand(s);
-    showForecast(s);
-  }
 }
 export function applyMarketReturn(s: State, r: number) {
   s.investedAssets = money(s.investedAssets * (1 + r));
@@ -286,7 +266,6 @@ export function applyPanicSell(s: State, r: number) {
   s.cash += sold;
   s.investedAssets -= sold;
   s.panicReentryPending = true;
-  s.panicPenalty = true;
 }
 export function applyDividend(s: State) {
   const dividend = money(s.investedAssets * ASSETS[s.assetType].dividendRate);
@@ -317,19 +296,9 @@ export function applyDecision(
     cashBefore = s.cash,
     assetBefore = s.assetType;
   const cardId = selectedCard(s)?.cardId ?? null;
-  let cashReserved = 0,
-    cardRebalanceFee = 0;
+  let cashReserved = 0;
   if (cardId) {
     s.cardUsageCounts[cardId]++;
-  }
-  if (
-    cardId === 'rebalance' &&
-    s.rebalanceTarget &&
-    s.rebalanceTarget !== s.assetType
-  ) {
-    cardRebalanceFee = payCost(s, brokerFee(s));
-    s.brokerFee += cardRebalanceFee;
-    s.assetType = s.rebalanceTarget;
   }
   if (cardId === 'cashReserve') {
     cashReserved = money(s.investedAssets * K.cashReserveRatio);
@@ -347,7 +316,6 @@ export function applyDecision(
     s.forecastInsight = false;
   }
   if (contrarianTriggered) s.contrarianPending = false;
-  s.panicPenalty = false;
   let additional = 0;
   if (decision === 'hold') applyHold(s, rate);
   else if (decision === 'panic') applyPanicSell(s, rate);
@@ -387,7 +355,6 @@ export function applyDecision(
     totalAfter: totalAssets(s),
     drawdown,
     dividend,
-    brokerFee: s.brokerFee,
     reentry: s.reentry,
     additional,
     cardId,
@@ -398,11 +365,9 @@ export function applyDecision(
     cashReserved,
     contrarianTriggered,
     contrarianArmed,
-    cardRebalanceFee,
     shopSpent: s.shopSpent,
   });
   discardHand(s);
-  s.rebalanceTarget = null;
   s.previousMarketEvent = event.id;
   s.phase = checkGameOver(s)
     ? 'gameOver'
@@ -429,44 +394,87 @@ export function cloneState(state: State): State {
   };
 }
 export function assetHistoryPoints(s: State) {
+  // A year-end incident is plotted just after its market so the line never doubles back.
   const points = [
-    { year: 0, total: C.initialTotal },
+    { year: 0, total: C.initialTotal, label: '開始' },
     ...s.history.flatMap((h) => [
-      { year: h.year, total: h.totalAfter },
+      { year: h.year, total: h.totalAfter, label: `${h.year}年目の相場` },
       ...s.incidentHistory
         .filter((e) => e.turn === h.year)
-        .map((e) => ({ year: e.turn, total: e.totalAfter })),
+        .map((e) => ({
+          year: e.turn + 0.5,
+          total: e.totalAfter,
+          label: `${e.turn}年目の出来事`,
+        })),
     ]),
   ];
   // A shop payment can end a run before the current year's market is settled.
   if (s.phase === 'gameOver' && s.history.at(-1)?.turn !== s.turn)
-    points.push({ year: s.turn, total: totalAssets(s) });
+    points.push({ year: s.turn, total: totalAssets(s), label: `${s.turn}年目` });
   return points;
 }
 export function calculateRank(total: number) {
   return RANKS.find((r) => total >= r.min)?.rank ?? 'F';
 }
+// Higher rarity wins the three visible slots, so a common title never hides a rare one.
+export const TITLES: { name: string; rarity: number; earned: (s: State) => boolean }[] =
+  [
+    {
+      name: '一攫千金',
+      rarity: 100,
+      earned: (s) => totalAssets(s) >= C.targetAssets,
+    },
+    {
+      name: 'NASDAQ信者',
+      rarity: 80,
+      earned: (s) => checkGameClear(s) && s.assetUsageTurns.nasdaq >= 15,
+    },
+    {
+      name: '暴落ハンター',
+      rarity: 75,
+      earned: (s) =>
+        s.history.filter(
+          (h) =>
+            ['crash', 'severe_crash'].includes(h.marketEvent) &&
+            h.decision === 'buyMore',
+        ).length >= 3,
+    },
+    {
+      name: '金ピカ投資家',
+      rarity: 60,
+      earned: (s) => checkGameClear(s) && s.assetUsageTurns.gold >= 10,
+    },
+    {
+      name: '鋼の握力',
+      rarity: 55,
+      earned: (s) => checkGameClear(s) && s.decisionCounts.panic === 0,
+    },
+    {
+      name: '狼狽王',
+      rarity: 50,
+      earned: (s) => s.decisionCounts.panic >= 8,
+    },
+    {
+      name: '鉄壁の守護者',
+      rarity: 45,
+      earned: (s) => s.maxDrawdown >= -0.15,
+    },
+    {
+      name: '退場芸人',
+      rarity: 40,
+      earned: (s) => checkGameOver(s) && s.turn <= 10,
+    },
+    {
+      name: 'フルインベストメント',
+      rarity: 20,
+      earned: (s) => checkGameClear(s) && s.cash / totalAssets(s) <= 0.1,
+    },
+  ];
 export function calculateTitles(s: State) {
-  const clear = checkGameClear(s);
-  const titles: string[] = [];
-  if (clear && s.decisionCounts.panic === 0) titles.push('鋼の握力');
-  if (
-    s.history.filter(
-      (h) =>
-        ['crash', 'severe_crash'].includes(h.marketEvent) &&
-        h.decision === 'buyMore',
-    ).length >= 3
-  )
-    titles.push('暴落ハンター');
-  if (clear && s.cash / totalAssets(s) <= 0.1)
-    titles.push('フルインベストメント');
-  if (s.maxDrawdown >= -0.15) titles.push('鉄壁の守護者');
-  if (totalAssets(s) >= C.targetAssets) titles.push('一攫千金');
-  if (s.decisionCounts.panic >= 5) titles.push('狼狽王');
-  if (checkGameOver(s) && s.turn <= 10) titles.push('退場芸人');
-  if (clear && s.assetUsageTurns.gold >= 10) titles.push('金ピカ投資家');
-  if (clear && s.assetUsageTurns.nasdaq >= 15) titles.push('NASDAQ信者');
-  return titles.slice(0, 3);
+  return TITLES.filter((t) => t.earned(s))
+    .sort((a, b) => b.rarity - a.rarity)
+    .slice(0, 3)
+    .map((t) => t.name);
 }
 function finishYear(s: State) {
   s.currentIncident = null;
@@ -516,11 +524,12 @@ export function resolveIncident(s: State, choiceId: string): boolean {
   } else if (event.kind === 'shock') {
     const [low, high] = event.range!;
     const sensitivity = {
+      allWorld: 0.9,
       sp500: 1,
       nasdaq: 1.3,
       dividend: 0.8,
-      gold: 0.35,
-      bonds: 0.2,
+      gold: 0.55,
+      bonds: 0.4,
     }[s.assetType];
     rate =
       Math.round(
@@ -603,20 +612,7 @@ export function reducer(state: State, action: Action): State {
   ) {
     s.assetType = action.assetId;
     startTurn(s);
-  } else if (
-    action.type === 'BROKER' &&
-    s.phase === 'broker' &&
-    Object.hasOwn(ASSETS, action.assetId)
-  )
-    changeAsset(s, action.assetId);
-  else if (
-    action.type === 'SHOP_ASSET' &&
-    s.phase === 'broker' &&
-    Object.hasOwn(ASSETS, action.assetId) &&
-    action.assetId !== s.assetType
-  )
-    changeAsset(s, action.assetId, false);
-  else if (action.type === 'LEAVE_SHOP' && s.phase === 'broker') {
+  } else if (action.type === 'LEAVE_SHOP' && s.phase === 'broker') {
     drawHand(s);
     showForecast(s);
   } else if (action.type === 'SHOP_BUY' && s.phase === 'broker') {
@@ -639,15 +635,7 @@ export function reducer(state: State, action: Action): State {
     if (action.instanceId !== null && !s.hand.includes(action.instanceId))
       return state;
     s.selectedCardId = action.instanceId;
-    s.rebalanceTarget = null;
-  } else if (
-    action.type === 'REBALANCE_TARGET' &&
-    s.phase === 'forecast' &&
-    selectedCard(s)?.cardId === 'rebalance' &&
-    Object.hasOwn(ASSETS, action.assetId)
-  )
-    s.rebalanceTarget = action.assetId;
-  else if (action.type === 'REWARD' && s.phase === 'reward') {
+  } else if (action.type === 'REWARD' && s.phase === 'reward') {
     if (action.cardId !== null) {
       if (!s.rewardChoices.includes(action.cardId)) return state;
       addCard(s, action.cardId, 'reward', s.turn);
@@ -672,6 +660,8 @@ export function reducer(state: State, action: Action): State {
       returns: calculateMarketReturn(definition, marketRandom(s, 'marketRng')),
     };
     s.forcedEventId = null;
+    // Normal years are settled by the chosen card alone; the three commands
+    // belong to market-shock incidents.
     const card = selectedCard(s)?.cardId;
     const decision =
       card === 'dollarCost' || card === 'contrarian' ? 'buyMore' : 'hold';
@@ -701,7 +691,6 @@ export function reducer(state: State, action: Action): State {
   if (checkGameOver(s) && !['incidentResult', 'turnResult'].includes(s.phase)) {
     s.phase = 'gameOver';
     discardHand(s);
-    s.rebalanceTarget = null;
   }
   return s;
 }

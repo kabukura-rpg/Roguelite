@@ -8,7 +8,6 @@ import {
   Coins,
   Wallet,
   Layers,
-  RefreshCw,
   Crosshair,
   Trash2,
   ShoppingBag,
@@ -33,7 +32,6 @@ import {
   type CardId,
 } from '@/lib/game/cards';
 import {
-  brokerFee,
   totalAssets,
   type State,
   type Action,
@@ -48,7 +46,6 @@ const icons = {
   coins: Coins,
   wallet: Wallet,
   layers: Layers,
-  refresh: RefreshCw,
   crosshair: Crosshair,
 };
 export function StrategyCard({
@@ -146,7 +143,6 @@ export function HandPanel({
 }) {
   const selected = selectedCard(state);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [rebalanceOpen, setRebalanceOpen] = useState(false);
   return (
     <section
       className={`hand-panel ${compact ? 'compact-hand' : ''}`}
@@ -175,11 +171,12 @@ export function HandPanel({
               cardId={c.cardId}
               selected={state.selectedCardId === id}
               disabled={disabled}
-              onClick={() => {
-                const next = state.selectedCardId === id ? null : id;
-                commit({ type: 'SELECT_CARD', instanceId: next });
-                setRebalanceOpen(next !== null && c.cardId === 'rebalance');
-              }}
+              onClick={() =>
+                commit({
+                  type: 'SELECT_CARD',
+                  instanceId: state.selectedCardId === id ? null : id,
+                })
+              }
               footer={state.selectedCardId === id ? '使用予定' : 'STRATEGY'}
             />
           );
@@ -196,12 +193,6 @@ export function HandPanel({
               <strong>{CARDS[selected.cardId].name}</strong>
             </span>
             <div>
-              {selected.cardId === 'rebalance' && (
-                <Button variant="ghost" onClick={() => setRebalanceOpen(true)}>
-                  {ASSETS[state.rebalanceTarget ?? state.assetType].name}
-                  <RefreshCw size={13} />
-                </Button>
-              )}
               <Button variant="ghost" onClick={() => setDetailsOpen(true)}>
                 詳細
               </Button>
@@ -236,41 +227,6 @@ export function HandPanel({
           <p>進行を確定するまで選び直せます。</p>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={rebalanceOpen && selected?.cardId === 'rebalance'}
-        onOpenChange={setRebalanceOpen}
-      >
-        <DialogContent className="help-dialog">
-          <DialogTitle>リバランス · 装備を選ぶ</DialogTitle>
-          <DialogDescription>
-            変更手数料 {yen(brokerFee(state))}
-            円。進行確定時に支払い、装備を変更します。
-          </DialogDescription>
-          <div className="rebalance-options">
-            {Object.values(ASSETS).map((a) => (
-              <Button
-                key={a.id}
-                variant={
-                  (state.rebalanceTarget ?? state.assetType) === a.id
-                    ? 'default'
-                    : 'outline'
-                }
-                className="secondary-button"
-                onClick={() => {
-                  commit({
-                    type: 'REBALANCE_TARGET',
-                    assetId: a.id as AssetId,
-                  });
-                  setRebalanceOpen(false);
-                }}
-              >
-                {a.name}
-                {state.assetType === a.id ? '（保有中・無料）' : ''}
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }
@@ -300,6 +256,7 @@ export function DeckList({
               <div className="deck-row-copy">
                 <strong>{card.name}</strong>
                 <p>{card.summary}</p>
+                <p className="deck-row-detail">{card.description}</p>
               </div>
               <span className="deck-zone">
                 {state.hand.includes(instance.id)
@@ -444,13 +401,6 @@ export function StrategyOutcome({ entry }: { entry: History }) {
       )}
       {entry.additional > 0 && (
         <p>買い増しで {yen(entry.additional)}円を追加投資。</p>
-      )}
-      {entry.assetBefore !== entry.assetType && (
-        <p>
-          装備変更：{ASSETS[entry.assetBefore].name} →{' '}
-          {ASSETS[entry.assetType].name}（手数料 {yen(entry.cardRebalanceFee)}
-          円）
-        </p>
       )}
       {entry.strategyDividend > 0 && (
         <p className="positive">

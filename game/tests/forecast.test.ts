@@ -73,10 +73,6 @@ void test('resolve draws once, locks strategy, records original forecast and rev
   assert.equal(publicMarketInfo(out).forecast, undefined);
   assert.equal(reducer(out, { type: 'RESOLVE' }), out);
   assert.equal(reducer(out, { type: 'SELECT_CARD', instanceId: null }), out);
-  assert.equal(
-    reducer(out, { type: 'REBALANCE_TARGET', assetId: 'gold' }),
-    out,
-  );
 });
 void test('same observations produce multiple outcomes, including contrary outcomes, at configured accuracy', () => {
   for (const id of Object.keys(FORECAST_PATTERNS) as ForecastId[]) {
@@ -106,10 +102,9 @@ void test('same observations produce multiple outcomes, including contrary outco
       assert.equal(matched / 10000, FORECAST_CONFIG.directionAccuracy);
       if (id !== 'uncertain') {
         const desired = id === 'bearish' ? -1 : 1;
-        const expected = FORECAST_PATTERNS[id].expected;
         assert.ok(
-          expected.every(
-            (event) =>
+          FORECAST_PATTERNS[id].expected.every(
+            ([event]) =>
               Math.sign(
                 MARKET_EVENTS.find((e) => e.id === event)!.returns.sp500,
               ) === desired,
@@ -187,7 +182,7 @@ void test('stop loss caps BOTH directions, including a pending bonus; leverage d
     CARD_CONFIG.stopLossCeiling,
   );
   assert.equal(
-    adjustedReturn(0.05, 'stopLoss', true),
+    adjustedReturn(0.22, 'stopLoss', true),
     CARD_CONFIG.stopLossCeiling,
   );
   assert.equal(adjustedReturn(-0.1, 'stopLoss', false), -0.1);

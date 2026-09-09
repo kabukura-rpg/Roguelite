@@ -4,6 +4,10 @@ import assert from 'node:assert/strict';
 import {
   MARKET_EVENTS,
   ASSETS,
+  ASSET_RATINGS,
+  RANKS,
+  RATING_LABELS,
+  RATING_MAX,
   type Decision,
   type AssetId,
 } from '../lib/game/data.ts';
@@ -15,7 +19,7 @@ import {
   applyPanicReentry,
   shouldShowBroker,
   updateDrawdown,
-  changeAsset,
+  payCost,
   totalAssets,
   calculateRank,
   calculateTitles,
@@ -23,8 +27,16 @@ import {
   type State,
 } from '../lib/game/engine.ts';
 const event = (id: string) => MARKET_EVENTS.find((e) => e.id === id)!;
+// Expected balances follow the return table, so tuning MARKET_EVENTS does not
+// invalidate the order-of-operations checks below.
+const marketRate = (id: string, asset: AssetId = 'sp500') =>
+  event(id).returns[asset];
+const grow = (invested: number, rate: number) =>
+  Math.round(invested * (1 + rate));
+// The spec's test cases are written against S&P500, not the default build.
 const crash = (decision: Decision) => {
   const s = createGame();
+  s.assetType = 'sp500';
   applyDecision(s, decision, event('crash'));
   return s;
 };
@@ -41,31 +53,38 @@ void test('TC01: initial 80/20 allocation and five selectable assets', () => {
 });
 void test('TC02 hold through crash', () => {
   const s = crash('hold');
-  assert.equal(s.investedAssets, 560000);
+  const grown = grow(800000, marketRate('crash'));
+  assert.equal(s.investedAssets, grown);
   assert.equal(s.cash, 200000);
-  assert.equal(totalAssets(s), 760000);
+  assert.equal(totalAssets(s), grown + 200000);
 });
 void test('TC03 buy before return', () => {
   const s = crash('buyMore');
-  assert.equal(s.investedAssets, 630000);
+  const grown = grow(900000, marketRate('crash'));
+  assert.equal(s.investedAssets, grown);
   assert.equal(s.cash, 100000);
-  assert.equal(totalAssets(s), 730000);
+  assert.equal(totalAssets(s), grown + 100000);
 });
 void test('TC04 panic after return', () => {
   const s = crash('panic');
-  assert.equal(s.investedAssets, 56000);
-  assert.equal(s.cash, 704000);
-  assert.equal(totalAssets(s), 760000);
+  const grown = grow(800000, marketRate('crash'));
+  const sold = Math.round(grown * 0.9);
+  assert.equal(s.investedAssets, grown - sold);
+  assert.equal(s.cash, 200000 + sold);
+  assert.equal(totalAssets(s), grown + 200000);
   assert.equal(s.panicReentryPending, true);
 });
 void test('TC05 reentry exactly once, cash conserved', () => {
   const s = crash('panic');
+  const cashBefore = s.cash;
+  const investedBefore = s.investedAssets;
+  const moved = Math.round(cashBefore * 0.3);
   applyPanicReentry(s);
-  assert.equal(s.investedAssets, 267200);
-  assert.equal(s.cash, 492800);
+  assert.equal(s.investedAssets, investedBefore + moved);
+  assert.equal(s.cash, cashBefore - moved);
   applyPanicReentry(s);
-  assert.equal(s.investedAssets, 267200);
-  assert.equal(s.cash, 492800);
+  assert.equal(s.investedAssets, investedBefore + moved);
+  assert.equal(s.cash, cashBefore - moved);
 });
 void test('TC06 dividend uses remaining year-end investment', () => {
   const s = createGame();
@@ -76,9 +95,40 @@ void test('TC06 dividend uses remaining year-end investment', () => {
   const p = createGame();
   p.assetType = 'dividend';
   applyDecision(p, 'panic', event('crash'));
-  assert.equal(p.history[0].dividend, 936);
-  assert.equal(p.investedAssets, 62400);
-  assert.equal(p.cash, 762536);
+  const grown = grow(800000, marketRate('crash', 'dividend'));
+  const left = grown - Math.round(grown * 0.9);
+  assert.equal(p.investedAssets, left);
+  assert.equal(p.history[0].dividend, Math.round(left * 0.015));
+  assert.equal(p.cash, 200000 + Math.round(grown * 0.9) + p.history[0].dividend);
+});
+void test('no asset dominates: every rating trio is a trade-off', () => {
+  const ids = Object.keys(ASSETS) as AssetId[];
+  const keys = Object.keys(RATING_LABELS) as (keyof typeof RATING_LABELS)[];
+  for (const id of ids)
+    for (const key of keys) {
+      const score = ASSET_RATINGS[id][key];
+      assert.ok(Number.isInteger(score) && score >= 1 && score <= RATING_MAX);
+    }
+  // The starting asset is the run's build, so no option may be a straight upgrade.
+  for (const a of ids)
+    for (const b of ids) {
+      if (a === b) continue;
+      assert.ok(
+        !(
+          keys.every((k) => ASSET_RATINGS[a][k] >= ASSET_RATINGS[b][k]) &&
+          keys.some((k) => ASSET_RATINGS[a][k] > ASSET_RATINGS[b][k])
+        ),
+        `${a} dominates ${b}`,
+      );
+    }
+});
+void test('the shop never changes the asset and normal years never panic sell', () => {
+  const s = play(7, 'nasdaq');
+  assert.equal(s.assetType, 'nasdaq');
+  assert.equal(s.assetUsageTurns.nasdaq, 20);
+  assert.equal(s.decisionCounts.panic, 0);
+  assert.ok(s.brokerVisits.length >= 3);
+  assert.ok(s.history.every((h) => h.resolution === 'strategy'));
 });
 void test('TC07 broker limits and guaranteed appearance', () => {
   assert.equal(shouldShowBroker(2, 5, 0), false);
@@ -110,7 +160,7 @@ function play(
   let guard = 0;
   while (!['clear', 'gameOver'].includes(s.phase)) {
     assert.ok(++guard < 100);
-    if (s.phase === 'broker') s = reducer(s, { type: 'BROKER', assetId });
+    if (s.phase === 'broker') s = reducer(s, { type: 'LEAVE_SHOP' });
     else if (s.phase === 'forecast') s = reducer(s, { type: 'RESOLVE' });
     else if (s.phase === 'incident' || s.phase === 'incidentResult')
       s = handleIncident(s, decision);
@@ -146,7 +196,14 @@ void test('TC10 zero assets ends the game and rounds to zero', () => {
   s.investedAssets = 1;
   applyDecision(s, 'hold', {
     ...event('crash'),
-    returns: { sp500: -2, nasdaq: -2, dividend: -2, gold: -2, bonds: -2 },
+    returns: {
+      allWorld: -2,
+      sp500: -2,
+      nasdaq: -2,
+      dividend: -2,
+      gold: -2,
+      bonds: -2,
+    },
   });
   assert.equal(s.phase, 'gameOver');
   assert.equal(totalAssets(s), 0);
@@ -154,41 +211,46 @@ void test('TC10 zero assets ends the game and rounds to zero', () => {
   assert.equal(calculateRank(0), 'F');
   assert.ok(calculateTitles(s).includes('退場芸人'));
 });
-void test('broker fee cash first, investment fallback, minimum, no-change free', () => {
+void test('costs come from cash first, then investment, and clamp at zero', () => {
   const s = createGame();
-  changeAsset(s, 'gold');
+  assert.equal(payCost(s, 10000), 10000);
   assert.equal(s.cash, 190000);
   assert.equal(s.investedAssets, 800000);
-  assert.equal(s.brokerFee, 10000);
   const t = createGame();
   t.cash = 2000;
-  changeAsset(t, 'bonds');
+  assert.equal(payCost(t, 8020), 8020);
   assert.equal(t.cash, 0);
   assert.equal(t.investedAssets, 793980);
   const u = createGame();
   u.investedAssets = 90000;
   u.cash = 10000;
-  changeAsset(u, 'gold');
+  assert.equal(payCost(u, 5000), 5000);
   assert.equal(totalAssets(u), 95000);
-  const v = createGame();
-  changeAsset(v, 'sp500');
-  assert.equal(totalAssets(v), 1000000);
-  assert.equal(v.brokerFee, 0);
 });
-void test('unaffordable fee clamps balances and causes game over', () => {
+void test('an unaffordable cost clamps balances and causes game over', () => {
   const s = createGame();
   s.cash = 10;
   s.investedAssets = 100;
-  changeAsset(s, 'gold');
+  assert.equal(payCost(s, 5000), 110);
   assert.equal(s.phase, 'gameOver');
   assert.equal(s.cash, 0);
   assert.equal(s.investedAssets, 0);
 });
 void test('market transition weights match specified multipliers', () => {
   const weights = getAdjustedEventWeights([{ marketEvent: 'crash' }]);
-  assert.equal(weights.find((w) => w.id === 'recovery')!.weight, 25);
-  assert.equal(weights.find((w) => w.id === 'bubble')!.weight, 2.1);
-  assert.equal(weights.find((w) => w.id === 'crash')!.weight, 3.5);
+  const base = (id: string) => event(id).weight;
+  assert.equal(
+    weights.find((w) => w.id === 'recovery')!.weight,
+    base('recovery') * 2.5,
+  );
+  assert.equal(
+    weights.find((w) => w.id === 'bubble')!.weight,
+    base('bubble') * 0.3,
+  );
+  assert.equal(
+    weights.find((w) => w.id === 'crash')!.weight,
+    base('crash') * 0.35,
+  );
   assert.equal(
     getAdjustedEventWeights([
       { marketEvent: 'bubble' },
@@ -241,17 +303,16 @@ void test('phase guards stop double settlement, duplicate next and invalid initi
   assert.ok(s.turn === 2 || s.phase === 'incident');
 });
 void test('rank thresholds and restart reset complete state', () => {
-  for (const [value, rank] of [
-    [0, 'F'],
-    [1, 'D'],
-    [999999, 'D'],
-    [1000000, 'C'],
-    [1300000, 'B'],
-    [1800000, 'A'],
-    [2500000, 'S'],
-    [3500000, 'SS'],
-  ] as const)
-    assert.equal(calculateRank(value), rank);
+  // Boundaries follow RANKS, so the scale can be retuned without editing the test.
+  assert.equal(calculateRank(0), 'F');
+  for (const { min, rank } of RANKS) {
+    assert.equal(calculateRank(min), rank);
+    if (min > 0) assert.notEqual(calculateRank(min - 1), rank);
+  }
+  assert.deepEqual(
+    RANKS.map((r) => r.min),
+    [...RANKS].sort((a, b) => b.min - a.min).map((r) => r.min),
+  );
   const s = reducer(play(1), { type: 'START', seed: 2 });
   assert.equal(s.phase, 'select');
   assert.equal(s.history.length, 0);
@@ -263,12 +324,16 @@ void test('titles require clear when specified and cap at 3', () => {
   assert.ok(calculateTitles(s).includes('鋼の握力'));
   assert.ok(calculateTitles(s).includes('金ピカ投資家'));
   const p = createGame();
-  p.decisionCounts.panic = 5;
+  p.decisionCounts.panic = 8;
   assert.ok(calculateTitles(p).includes('狼狽王'));
-  s.investedAssets = 4000000;
+  s.investedAssets = 8000000;
   s.cash = 0;
   s.maxDrawdown = 0;
-  assert.equal(calculateTitles(s).length, 3);
+  const shown = calculateTitles(s);
+  assert.equal(shown.length, 3);
+  // The three slots go to the rarest titles, not to whichever is checked first.
+  assert.ok(shown.includes('一攫千金'));
+  assert.ok(!shown.includes('フルインベストメント'));
 });
 void test('debug forcing is restricted to debug forecast', () => {
   let s = reducer(createGame(), { type: 'START', seed: 1, debug: false });

@@ -2706,3 +2706,19 @@ body:has(.game-shell) {
     margin-top: 4px;
   }
 }
+
+/* Fallback: when the board genuinely cannot fit (very short viewport or
+   enlarged text), scroll the page instead of clipping controls. */
+@media (max-height: 420px) {
+  body:has(.game-shell) {
+    overflow: auto;
+  }
+  .game-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .board-content {
+    overflow: visible;
+  }
+}

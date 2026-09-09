@@ -7,11 +7,15 @@ export const FORECAST_CONFIG = {
   returnVariation: 0.2,
 };
 export type ForecastId = 'bullish' | 'bearish' | 'uncertain' | 'recovery';
+// Each bucket carries its own weights. Using the global MARKET_EVENTS weights here
+// distorted the realised distribution, because an event that appears in several
+// buckets was drawn far more often than its own weight (see FORECAST_MIX below).
+type Bucket = [string, number][];
 type Pattern = {
   name: string;
   signals: [string, string][];
-  expected: string[];
-  surprise: string[];
+  expected: Bucket;
+  surprise: Bucket;
 };
 export const FORECAST_PATTERNS: Record<ForecastId, Pattern> = {
   bullish: {
@@ -22,8 +26,15 @@ export const FORECAST_PATTERNS: Record<ForecastId, Pattern> = {
       ['金利', '安定'],
       ['ボラティリティ', '落ち着いている'],
     ],
-    expected: ['normal_up', 'strong_up', 'bubble'],
-    surprise: ['correction', 'stagnation'],
+    expected: [
+      ['normal_up', 38],
+      ['strong_up', 40],
+      ['bubble', 22],
+    ],
+    surprise: [
+      ['correction', 45],
+      ['stagnation', 55],
+    ],
   },
   bearish: {
     name: '弱気予報',
@@ -33,8 +44,16 @@ export const FORECAST_PATTERNS: Record<ForecastId, Pattern> = {
       ['金利', '上昇傾向'],
       ['ボラティリティ', '高め'],
     ],
-    expected: ['correction', 'crash', 'severe_crash'],
-    surprise: ['stagnation', 'normal_up', 'recovery'],
+    expected: [
+      ['correction', 55],
+      ['crash', 33],
+      ['severe_crash', 12],
+    ],
+    surprise: [
+      ['stagnation', 30],
+      ['normal_up', 45],
+      ['recovery', 25],
+    ],
   },
   uncertain: {
     name: '不透明予報',
@@ -44,8 +63,15 @@ export const FORECAST_PATTERNS: Record<ForecastId, Pattern> = {
       ['金利', '不透明'],
       ['ボラティリティ', 'やや高い'],
     ],
-    expected: ['stagnation', 'inflation', 'rate_hike'],
-    surprise: ['normal_up', 'correction'],
+    expected: [
+      ['stagnation', 34],
+      ['inflation', 30],
+      ['rate_hike', 36],
+    ],
+    surprise: [
+      ['normal_up', 75],
+      ['correction', 25],
+    ],
   },
   recovery: {
     name: '回復予報',
@@ -55,10 +81,17 @@ export const FORECAST_PATTERNS: Record<ForecastId, Pattern> = {
       ['金利', '落ち着きつつある'],
       ['ボラティリティ', 'まだ高い'],
     ],
-    expected: ['recovery', 'normal_up'],
-    surprise: ['stagnation', 'crash'],
+    expected: [
+      ['recovery', 60],
+      ['normal_up', 40],
+    ],
+    surprise: [
+      ['stagnation', 60],
+      ['crash', 40],
+    ],
   },
 };
+export const forecastEvents = (bucket: Bucket) => bucket.map(([id]) => id);
 export type Forecast = {
   id: ForecastId;
   accuracy: number;
@@ -70,7 +103,11 @@ function weightedPick<T>(
   entries: { value: T; weight: number }[],
   roll: number,
 ): T {
-  let remaining = roll * entries.reduce((sum, e) => sum + e.weight, 0);
+  const total = entries.reduce((sum, e) => sum + e.weight, 0);
+  // Every candidate can be suppressed at once (three of the same market in a row),
+  // so fall back to the last entry instead of reading past the end of the list.
+  if (total <= 0) return entries.at(-1)!.value;
+  let remaining = roll * total;
   for (const e of entries) {
     remaining -= e.weight;
     if (remaining < 0) return e.value;
@@ -112,20 +149,21 @@ export function getAdjustedEventWeights(history: ForecastHistory) {
   const last = history.at(-1)?.marketEvent;
   const before = history.at(-2)?.marketEvent;
   return MARKET_EVENTS.map((event) => {
-    let weight = event.weight;
+    let factor = 1;
     if (last === 'crash' || last === 'severe_crash') {
-      if (event.id === 'recovery') weight *= 2.5;
-      if (event.id === 'bubble') weight *= 0.3;
-      if (event.id === 'strong_up') weight *= 1.3;
+      if (event.id === 'recovery') factor *= 2.5;
+      if (event.id === 'bubble') factor *= 0.3;
+      if (event.id === 'strong_up') factor *= 1.3;
     }
     if (last === 'bubble') {
-      if (event.id === 'correction') weight *= 1.5;
-      if (event.id === 'crash') weight *= 1.8;
-      if (event.id === 'severe_crash') weight *= 1.5;
+      if (event.id === 'correction') factor *= 1.5;
+      if (event.id === 'crash') factor *= 1.8;
+      if (event.id === 'severe_crash') factor *= 1.5;
     }
-    if (last === 'strong_up' && event.id === 'bubble') weight *= 1.4;
-    if (event.id === last) weight *= before === last ? 0 : 0.35;
-    return { id: event.id, weight };
+    if (last === 'strong_up' && event.id === 'bubble') factor *= 1.4;
+    if (event.id === last) factor *= before === last ? 0 : 0.35;
+    // `factor` lets a forecast bucket apply the same history rules to its own weights.
+    return { id: event.id, weight: event.weight * factor, factor };
   });
 }
 
@@ -137,15 +175,16 @@ export function selectActualMarketEvent(
 ): string {
   const pattern = FORECAST_PATTERNS[forecast.id];
   const matches = roll < forecast.accuracy;
-  const ids = matches ? pattern.expected : pattern.surprise;
+  const bucket = matches ? pattern.expected : pattern.surprise;
   const bucketRoll = matches
     ? roll / forecast.accuracy
     : (roll - forecast.accuracy) / (1 - forecast.accuracy);
-  const weights = getAdjustedEventWeights(history).filter((e) =>
-    ids.includes(e.id),
-  );
+  const adjusted = getAdjustedEventWeights(history);
   return weightedPick(
-    weights.map((e) => ({ value: e.id, weight: e.weight })),
+    bucket.map(([id, weight]) => ({
+      value: id,
+      weight: weight * (adjusted.find((e) => e.id === id)?.factor ?? 1),
+    })),
     bucketRoll,
   );
 }
@@ -165,7 +204,9 @@ export function calculateMarketReturn(
 }
 
 export function compareForecast(forecast: Forecast, eventId: string) {
-  const matched = FORECAST_PATTERNS[forecast.id].expected.includes(eventId);
+  const matched = forecastEvents(FORECAST_PATTERNS[forecast.id].expected).includes(
+    eventId,
+  );
   const message =
     forecast.id === 'uncertain'
       ? matched

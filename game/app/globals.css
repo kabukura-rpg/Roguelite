@@ -195,8 +195,13 @@ h1 em {
 }
 .asset-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+@media (max-width: 900px) {
+  .asset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .asset-card {
   background: #171f2c;
@@ -1592,27 +1597,6 @@ a:focus-visible {
   color: var(--muted-foreground);
   height: 40px;
 }
-.rebalance-picker {
-  padding: 18px;
-  background: #bba4eb0a;
-  border: 1px solid #bba4eb44;
-  margin-top: 12px;
-  border-radius: 8px;
-}
-.rebalance-picker > p {
-  font-size: 0.875rem;
-  color: #d0bdef;
-}
-.rebalance-picker > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
-}
-.rebalance-picker small {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
 .base-impact {
   font-size: 0.8125rem;
   color: var(--muted-foreground);
@@ -2075,7 +2059,53 @@ a:focus-visible {
     width: 100%;
     margin-top: 0;
   }
-  .rebalance-picker {
-    padding: 14px;
   }
+
+/* Relative ratings on the setup screen: comparison first, numbers second. */
+.asset-ratings {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.asset-ratings > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.asset-ratings dt {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.asset-ratings dd {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+}
+.asset-ratings i {
+  width: 13px;
+  height: 5px;
+  border-radius: 1px;
+  background: #33415466;
+}
+.asset-ratings i.on {
+  background: var(--asset-color, #dab77c);
+}
+/* Card text in the deck list: the hover tooltip never appears on touch devices. */
+.deck-row-detail {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+/* Seed line on the result screen: the run can be replayed or shared. */
+.seed-note {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.seed-note code {
+  color: #d1b783;
 }

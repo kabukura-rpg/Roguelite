@@ -5,7 +5,7 @@ export const CARD_CONFIG = {
   removalCost: 30_000,
   diversificationFactor: 0.7,
   stopLossFloor: -0.25,
-  stopLossCeiling: 0.05,
+  stopLossCeiling: 0.14,
   leverageFactor: 2,
   dividendDuration: 3,
   dividendRate: 0.01,
@@ -28,9 +28,9 @@ export const CARDS = {
     category: '守備',
     icon: 'scissors',
     color: '#91b9ed',
-    summary: '損失 −25% / 利益 +5%まで',
+    summary: '損失 −25% / 利益 +14%まで',
     description:
-      'この年の相場による損失は最大−25%、利益も最大+5%に制限。上昇を取り逃す代わりに下落を抑えます。配当・現金・手数料は対象外。',
+      'この年の相場による損失は最大−25%、利益も最大+14%に制限。大きな上昇を取り逃す代わりに、大きな下落を抑えます。配当・現金・手数料は対象外。',
     price: 60_000,
   },
   leverage: {
@@ -71,16 +71,6 @@ export const CARDS = {
     description:
       'このカードだけで、相場リターンの前に現金の75%を追加投資する。上昇時の利益も下落時の損失も増えます。現金がなくても使用できます。',
     price: 50_000,
-  },
-  rebalance: {
-    name: 'リバランス',
-    category: '装備',
-    icon: 'refresh',
-    color: '#baa5ed',
-    summary: '投資先を変更',
-    description:
-      'この年だけショップの外で投資先を変更。手数料は総資産の1%・最低5,000円。',
-    price: 60_000,
   },
   contrarian: {
     name: '逆張り',

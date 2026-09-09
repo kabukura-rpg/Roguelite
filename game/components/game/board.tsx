@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import {
   Compass,
+  Globe,
   Coins,
   Wallet,
   Shield,
@@ -33,30 +34,51 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   ASSETS,
+  ASSET_RATINGS,
   MARKET_EVENTS,
   DECISIONS,
   GAME_CONFIG,
+  RATING_LABELS,
+  RATING_MAX,
   type AssetId,
+  type RatingKey,
 } from '@/lib/game/data';
 import { FORECAST_PATTERNS, compareForecast } from '@/lib/game/forecast';
 import { CARDS, CARD_CONFIG, selectedCard } from '@/lib/game/cards';
-import {
-  totalAssets,
-  brokerFee,
-  type State,
-  type Action,
-} from '@/lib/game/engine';
+import { totalAssets, type State, type Action } from '@/lib/game/engine';
 import { HandPanel, StrategyCard, DeckList, StrategyOutcome } from './strategy';
 import { IncidentBoard } from './incidents';
 const yen = (n: number) => Math.round(n).toLocaleString('ja-JP');
 const pct = (n: number) => `${n > 0 ? '+' : ''}${(n * 100).toFixed(1)}%`;
 const equipmentIcons = {
+  allWorld: Globe,
   sp500: Compass,
   nasdaq: Sparkles,
   dividend: Coins,
   gold: Gem,
   bonds: Shield,
 };
+// The setup screen shows relative ratings, not raw percentages: the point is how
+// the assets compare, and the numbers are derived so they never go stale.
+export function AssetRatings({ id }: { id: AssetId }) {
+  return (
+    <dl className="asset-ratings">
+      {(Object.keys(RATING_LABELS) as RatingKey[]).map((key) => {
+        const score = ASSET_RATINGS[id][key];
+        return (
+          <div key={key}>
+            <dt>{RATING_LABELS[key]}</dt>
+            <dd aria-label={`${RATING_LABELS[key]} ${score} / ${RATING_MAX}`}>
+              {Array.from({ length: RATING_MAX }, (_, i) => (
+                <i key={i} className={i < score ? 'on' : ''} aria-hidden="true" />
+              ))}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
 export function GameHUD({ state: s }: { state: State }) {
   const Equipment = equipmentIcons[s.assetType];
   const goalProgress = Math.min(
@@ -103,7 +125,7 @@ export function GameHUD({ state: s }: { state: State }) {
         <Equipment style={{ color: ASSETS[s.assetType].color }} />
         <div>
           <span>
-            現在の資産 <small>投資 {yen(s.investedAssets)}円</small>
+            投資先 <small>投資中 {yen(s.investedAssets)}円</small>
           </span>
           <strong>{ASSETS[s.assetType].name}</strong>
         </div>
@@ -386,62 +408,11 @@ function ShopBoard({
           <h2>次の戦いに、備える。</h2>
         </div>
       </div>
-      <Tabs defaultValue="equipment" className="shop-tabs">
+      <Tabs defaultValue="cards" className="shop-tabs">
         <TabsList>
-          <TabsTrigger value="equipment">装備変更</TabsTrigger>
           <TabsTrigger value="cards">カード購入</TabsTrigger>
           <TabsTrigger value="remove">カード削除</TabsTrigger>
         </TabsList>
-        <TabsContent value="equipment">
-          <div className="shop-tab-caption">
-            変更手数料 {yen(brokerFee(s))}円{' '}
-            <span>総資産の1%・最低5,000円</span>
-          </div>
-          <div className="shop-equipment-grid">
-            {Object.values(ASSETS).map((a) => {
-              const Icon = equipmentIcons[a.id];
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  className={`shop-equipment ${s.assetType === a.id ? 'equipped' : ''}`}
-                  disabled={s.assetType === a.id}
-                  onClick={() =>
-                    commit({ type: 'SHOP_ASSET', assetId: a.id as AssetId })
-                  }
-                >
-                  <Icon style={{ color: a.color }} />
-                  <span className="eyebrow">{a.type}</span>
-                  <h3>{a.name}</h3>
-                  <p>{a.description}</p>
-                  <dl>
-                    <div>
-                      <dt>得意</dt>
-                      <dd>{a.strong}</dd>
-                    </div>
-                    <div>
-                      <dt>苦手</dt>
-                      <dd>{a.weak}</dd>
-                    </div>
-                  </dl>
-                  <span className="equipment-action">
-                    {s.assetType === a.id ? (
-                      <>
-                        <Check size={14} />
-                        装備中
-                      </>
-                    ) : (
-                      <>
-                        この装備に変更
-                        <ArrowRight size={14} />
-                      </>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </TabsContent>
         <TabsContent value="cards">
           <div className="shop-tab-caption">
             今回の品ぞろえ{' '}
@@ -475,7 +446,7 @@ function ShopBoard({
       </Tabs>
       <div className="shop-board-footer">
         <p>
-          現金から優先して支払い、不足分は投資資産から。
+          現金から優先して支払い、不足分は投資資産から。投資先は最初に選んだままです。
           <span>カード購入・削除 合計 {yen(s.shopSpent)}円</span>
         </p>
         <Button

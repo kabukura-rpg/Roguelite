@@ -202,7 +202,8 @@ void test('asset chart includes both normal settlement and the later incident', 
   out = reducer(out, { type: 'INCIDENT_CHOICE', choiceId: 'cash' });
   const points = assetHistoryPoints(out);
   assert.equal(points.length, 3);
-  assert.equal(points[1].year, points[2].year);
+  // The incident sits half a year after its market so the chart never doubles back.
+  assert.equal(points[2].year, points[1].year + 0.5);
   assert.equal(points.at(-1)!.total, totalAssets(out));
 });
 void test('normal year 20 cannot skip the guaranteed final incident or clear early', () => {

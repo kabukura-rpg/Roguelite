@@ -63,12 +63,18 @@ void test('normal turn: decline or no hand still resolves without a command', ()
 
 void test('dollar cost invests 75% of cash by itself before the market', () => {
   const out = reducer(turn('dollarCost'), { type: 'RESOLVE' });
+  assert.equal(out.history[0].decision, 'buyMore');
   assert.equal(out.history[0].additional, 150_000);
   assert.equal(out.cash, 50_000);
   assert.equal(
     out.investedAssets,
     Math.round(950_000 * (1 + out.history[0].baseReturn)),
   );
+  // Any other card leaves the allocation alone.
+  const held = reducer(turn('diversify'), { type: 'RESOLVE' });
+  assert.equal(held.history[0].decision, 'hold');
+  assert.equal(held.history[0].additional, 0);
+  assert.equal(held.cash, 200_000);
 });
 
 void test('contrarian invests 50% by itself and arms only on a crash', () => {
@@ -89,21 +95,6 @@ void test('cash reserve transfers 20% before settlement; no additional purchase'
   assert.equal(
     out.investedAssets,
     Math.round(640_000 * (1 + out.history[0].baseReturn)),
-  );
-});
-
-void test('rebalance charges once on resolve and cannot change balances when staged', () => {
-  let s = turn('rebalance');
-  s = reducer(s, { type: 'REBALANCE_TARGET', assetId: 'gold' });
-  assert.equal(s.assetType, 'sp500');
-  assert.equal(totalAssets(s), 1_000_000);
-  const out = reducer(s, { type: 'RESOLVE' });
-  assert.equal(out.assetType, 'gold');
-  assert.equal(out.history[0].cardRebalanceFee, 10_000);
-  assert.equal(out.cash, 190_000);
-  assert.equal(
-    out.investedAssets,
-    Math.round(800_000 * (1 + out.history[0].baseReturn)),
   );
 });
 

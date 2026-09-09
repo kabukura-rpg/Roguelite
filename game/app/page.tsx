@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BookOpen,
   Compass,
+  Globe,
   Gem,
   Shield,
   Sparkles,
@@ -14,7 +15,12 @@ import {
   Info,
   RotateCcw,
 } from 'lucide-react';
-import { GameBoard, GameHUD, GameTools } from '@/components/game/board';
+import {
+  GameBoard,
+  GameHUD,
+  GameTools,
+  AssetRatings,
+} from '@/components/game/board';
 import { IncidentLog } from '@/components/game/incidents';
 import { publicMarketInfo, FORECAST_CONFIG } from '@/lib/game/forecast';
 import { INCIDENTS } from '@/lib/game/incidents';
@@ -61,6 +67,7 @@ const yen = (n: number) => Math.round(n).toLocaleString('ja-JP');
 const pct = (n: number) => `${n > 0 ? '+' : ''}${(n * 100).toFixed(1)}%`;
 const signed = (n: number) => `${n > 0 ? '+' : ''}${yen(n)}円`;
 const icons = {
+  globe: Globe,
   compass: Compass,
   sparkles: Sparkles,
   coins: Coins,
@@ -70,6 +77,36 @@ const icons = {
 function AssetIcon({ id, size = 24 }: { id: AssetId; size?: number }) {
   const Icon = icons[ASSETS[id].icon];
   return <Icon size={size} strokeWidth={1.5} aria-hidden="true" />;
+}
+// Progress is kept in the browser so a reload does not throw away a 20-year run.
+const SAVE_KEY = 'kabukura-save';
+const SAVE_VERSION = 1;
+const RESUMABLE = (phase: string) =>
+  !['title', 'select', 'clear', 'gameOver'].includes(phase);
+function readSave(): State | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as { v?: number; state?: State };
+    if (saved?.v !== SAVE_VERSION || !saved.state?.phase) return null;
+    if (!RESUMABLE(saved.state.phase)) return null;
+    // Merge over a fresh game so a save written by an older build still opens.
+    return { ...createGame(saved.state.seed, saved.state.debug), ...saved.state };
+  } catch {
+    return null;
+  }
+}
+function writeSave(state: State) {
+  try {
+    if (RESUMABLE(state.phase))
+      localStorage.setItem(
+        SAVE_KEY,
+        JSON.stringify({ v: SAVE_VERSION, state }),
+      );
+    else localStorage.removeItem(SAVE_KEY);
+  } catch {
+    /* Blocked storage (private windows, previews): the game still plays. */
+  }
 }
 function seedOptions() {
   const params = new URLSearchParams(window.location.search);
@@ -85,8 +122,9 @@ function seedOptions() {
 function Chart({ state }: { state: State }) {
   const timeline = assetHistoryPoints(state);
   const values = timeline.map((point) => point.total);
-  const high = Math.max(...values) * 1.12;
-  const low = Math.min(...values) * 0.8;
+  // A flat series would collapse the scale, so keep a minimum span.
+  const high = Math.max(Math.max(...values) * 1.12, 10000);
+  const low = Math.min(Math.min(...values) * 0.8, high - 10000);
   const x = (i: number) => 66 + (i / 20) * 790;
   const y = (v: number) => 174 - ((v - low) / (high - low)) * 145;
   const points = values
@@ -105,7 +143,7 @@ function Chart({ state }: { state: State }) {
         // SVG chart uses an explicit image role for assistive technology.
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
         role="img"
-        aria-label={`資産推移：初期100万円から${timeline.at(-1)!.year}年目${yen(totalAssets(state))}円。年ごとの詳細は冒険の記録で確認できます。`}
+        aria-label={`資産推移：初期100万円から${Math.floor(timeline.at(-1)!.year)}年目${yen(totalAssets(state))}円。年ごとの詳細は冒険の記録で確認できます。`}
       >
         <defs>
           <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
@@ -156,7 +194,7 @@ function Chart({ state }: { state: State }) {
             fill="#dab77c"
           >
             <title>
-              {timeline[i].year}年目：{yen(v)}円
+              {timeline[i].label}：{yen(v)}円
             </title>
           </circle>
         ))}
@@ -204,6 +242,7 @@ function AssetChoices({
               苦手 <b>{a.weak}</b>
             </span>
           </div>
+          <AssetRatings id={a.id} />
           <span className="asset-choose">
             {broker && current === a.id
               ? '保有中'
@@ -232,7 +271,6 @@ function HistoryTable({ state }: { state: State }) {
             '総資産',
             '前年比',
             '配当',
-            '手数料',
             'ショップ',
           ].map((h) => (
             <TableHead key={h}>{h}</TableHead>
@@ -270,7 +308,6 @@ function HistoryTable({ state }: { state: State }) {
               )}
             </TableCell>
             <TableCell>{yen(h.dividend + h.strategyDividend)}円</TableCell>
-            <TableCell>{yen(h.brokerFee)}円</TableCell>
             <TableCell>{yen(h.shopSpent)}円</TableCell>
           </TableRow>
         ))}
@@ -296,13 +333,24 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deckOpen, setDeckOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [resumable, setResumable] = useState<State | null>(null);
   const commit = (action: Action) => {
     const next = reducer(stateRef.current, action);
     stateRef.current = next;
     setState(next);
+    writeSave(next);
+    if (next.phase !== 'title') setResumable(null);
     return next;
   };
   const start = () => commit({ type: 'START', ...seedOptions() });
+  const resume = () => {
+    if (!resumable) return;
+    stateRef.current = resumable;
+    setState(resumable);
+    setResumable(null);
+  };
+  // localStorage is read after mount so the first render matches the server output.
+  useEffect(() => setResumable(readSave()), []);
   useEffect(() => {
     const context = (
       document as Document & {
@@ -349,7 +397,6 @@ export default function Home() {
         completedYears: s.history.length,
         hand: s.hand.map((id) => s.deck.find((c) => c.id === id)),
         selectedCard: selectedCard(s),
-        rebalanceTarget: s.rebalanceTarget,
         drawCount: s.drawPile.length,
         discardCount: s.discardPile.length,
         deckSize: s.deck.length,
@@ -378,7 +425,7 @@ export default function Home() {
       {
         name: 'play_kabukura_action',
         description:
-          '市場予報を読み、結果を知る前にselect_cardで手札のinstanceId（nullで解除）、rebalance_targetで装備を選択しresolveで戦略確定後に相場を抽選。rewardはcardId（nullでスキップ）。ショップはshop_asset、shop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。',
+          '市場予報を読み、結果を知る前にselect_cardで手札のinstanceId（nullで解除）を選び、resolveで戦略確定後に相場を抽選。rewardはcardId（nullでスキップ）。ショップはshop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。投資先は開始時の選択から変わりません。',
         inputSchema: {
           type: 'object',
           properties: {
@@ -387,15 +434,12 @@ export default function Home() {
               enum: [
                 'start',
                 'select_asset',
-                'broker',
                 'resolve',
                 'incident_choice',
                 'incident_next',
                 'next',
                 'select_card',
-                'rebalance_target',
                 'reward',
-                'shop_asset',
                 'shop_buy',
                 'shop_remove',
                 'leave_shop',
@@ -422,14 +466,11 @@ export default function Home() {
           if (v.action === 'start')
             action = { type: 'START', ...seedOptions() };
           else if (
-            (v.action === 'select_asset' || v.action === 'broker') &&
+            v.action === 'select_asset' &&
             typeof v.assetId === 'string' &&
             Object.hasOwn(ASSETS, v.assetId)
           )
-            action = {
-              type: v.action === 'broker' ? 'BROKER' : 'SELECT_ASSET',
-              assetId: v.assetId as AssetId,
-            };
+            action = { type: 'SELECT_ASSET', assetId: v.assetId as AssetId };
           else if (
             v.action === 'incident_choice' &&
             typeof v.choiceId === 'string'
@@ -450,16 +491,6 @@ export default function Home() {
               (typeof v.cardId === 'string' && Object.hasOwn(CARDS, v.cardId)))
           )
             action = { type: 'REWARD', cardId: v.cardId as CardId | null };
-          else if (
-            (v.action === 'rebalance_target' || v.action === 'shop_asset') &&
-            typeof v.assetId === 'string' &&
-            Object.hasOwn(ASSETS, v.assetId)
-          )
-            action = {
-              type:
-                v.action === 'shop_asset' ? 'SHOP_ASSET' : 'REBALANCE_TARGET',
-              assetId: v.assetId as AssetId,
-            };
           else if (v.action === 'shop_buy' && typeof v.offerId === 'string')
             action = { type: 'SHOP_BUY', offerId: v.offerId };
           else if (
@@ -529,11 +560,21 @@ export default function Home() {
           <p>
             100万円を元手に、20年間の市場を生き抜く。
             <br />
-            装備を選び、手札を組み合わせ、相場を攻略する。
+            投資先を選び、手札を組み合わせ、相場を攻略する。
           </p>
           <Button className="primary" onClick={start}>
-            冒険をはじめる <ArrowRight />
+            {resumable ? 'はじめから' : '冒険をはじめる'} <ArrowRight />
           </Button>
+          {resumable && (
+            <Button
+              variant="outline"
+              className="secondary-button"
+              onClick={resume}
+            >
+              <RotateCcw /> 続きから · {resumable.turn}年目 /{' '}
+              {yen(totalAssets(resumable))}円
+            </Button>
+          )}
           <div className="title-facts">
             <span>
               <Coins /> 初期資産 100万円
@@ -542,7 +583,7 @@ export default function Home() {
               <Compass /> 全20年の旅
             </span>
             <span>
-              <Shield /> 5つの装備 × 8つの戦略
+              <Shield /> 6つの投資先 × 7つの戦略
             </span>
           </div>
         </section>
@@ -552,8 +593,10 @@ export default function Home() {
           <div className="section-heading">
             <div>
               <span className="eyebrow gold">PREPARATION / 旅の支度</span>
-              <h1 className="page-title">最初の装備を選ぼう。</h1>
-              <p>80万円をひとつの資産へ。20万円は、次の一手のために。</p>
+              <h1 className="page-title">20年の相棒を選ぼう。</h1>
+              <p>
+                80万円をひとつの投資先へ。20万円は、次の一手のために。この投資先で20年間を戦います。
+              </p>
             </div>
             <span className="setup-money">
               初期資産
@@ -568,7 +611,7 @@ export default function Home() {
           <div className="info-line">
             <Info size={17} />
             <span>
-              初期デッキは10枚。毎年5枚を引き、戦略カードを1枚まで使えます。装備は証券会社で変更できます。
+  初期デッキは10枚。毎年5枚を引き、戦略カードを1枚まで使えます。投資先は最初に選んだひとつで20年を戦います。
             </span>
           </div>
           <Button
@@ -642,7 +685,7 @@ export default function Home() {
                   <p className="last-year-note negative">
                     {s.turn}
                     年目のショップで資産が0円になりました。カード購入・削除{' '}
-                    {yen(s.shopSpent)}円 / 装備変更 {yen(s.brokerFee)}円。
+                    {yen(s.shopSpent)}円。
                   </p>
                 )}
                 <CardResult state={s} />
@@ -667,6 +710,10 @@ export default function Home() {
                       : ''}
                   </p>
                 )}
+                <p className="seed-note">
+                  SEED {s.seed} · 同じ相場をもう一度なら URL に{' '}
+                  <code>?seed={s.seed}</code> を付けてください。
+                </p>
                 <div className="final-buttons">
                   <Button className="primary" onClick={start}>
                     <RotateCcw /> もう一度、冒険へ
@@ -760,7 +807,7 @@ export default function Home() {
             <li>
               <strong>投資先を選ぶ</strong>
               <p>
-                100万円のうち80万円を投資、20万円を現金で持って出発します。同時に持てる投資先は1種類です。
+                100万円のうち80万円を投資、20万円を現金で持って出発します。投資先は20年間変えられません。この選択が難易度と戦い方を決めるので、成長性・安定性・暴落耐性の相対評価を見比べて選んでください。
               </p>
             </li>
             <li>
@@ -780,7 +827,7 @@ export default function Home() {
             <li>
               <strong>戦略を確定して、結果を見る</strong>
               <p>
-                選んだカードを使うか、カードを使わずに進みます。ドルコスト平均法は現金75%、逆張りは現金50%を追加投資。現金確保は投資額20%を現金化します。カードなしなら現在の配分を維持します。損切りは損失−25%・利益+5%が上限。レバレッジは利益も損失も2倍です。
+                選んだカードを使うか、カードを使わずに進みます。ドルコスト平均法は現金75%、逆張りは現金50%を追加投資。現金確保は投資額20%を現金化します。カードなしなら現在の配分を維持します。損切りは損失−25%・利益+14%が上限。レバレッジは利益も損失も2倍です。
               </p>
             </li>
             <li>
@@ -797,9 +844,9 @@ export default function Home() {
               </p>
             </li>
             <li>
-              <strong>証券会社で投資先を見直す</strong>
+              <strong>証券会社でデッキを整える</strong>
               <p>
-                3〜5年ごとに到着。装備変更は総資産の1%（最低5,000円）、カード削除は3万円。カードも購入できます。現金を優先し、不足分は投資資産から支払います。現状維持は無料です。
+                3〜5年ごとに到着。戦略カードの購入と、1枚3万円での削除ができます。現金を優先し、不足分は投資資産から支払います。何も買わずに出るのは無料です。投資先は最初に選んだものから変わりません。
               </p>
             </li>
             <li>
@@ -840,7 +887,7 @@ export default function Home() {
         <DialogContent className="history-dialog deck-dialog">
           <DialogTitle>あなたの投資戦略 · {s.deck.length}枚</DialogTitle>
           <DialogDescription>
-            装備はデッキに含まれません。山札の並び順は表示していません。
+            投資先はデッキに含まれません。山札の並び順は表示していません。
           </DialogDescription>
           <DeckList state={s} />
         </DialogContent>
