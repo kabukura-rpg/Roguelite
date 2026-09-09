@@ -146,7 +146,7 @@ export const INCIDENTS: Incident[] = [
       {
         id: 'study',
         label: '市場を調べる',
-        hint: '費用なし。次の市場予報で資産ごとの方向感を確認できる。',
+        hint: '費用なし。次の市場予報の精度が上がる。外れる可能性は残る。',
         insight: true,
       },
     ],
@@ -161,7 +161,7 @@ export const INCIDENTS: Incident[] = [
       {
         id: 'join',
         label: '参加する',
-        hint: '現金2万円で「分散投資」を1枚獲得し、次の予報が詳しくなる。',
+        hint: '現金2万円で「分散投資」を1枚獲得し、次の市場予報の精度が上がる。',
         cost: 20000,
         card: 'diversify',
         insight: true,
@@ -206,7 +206,7 @@ export const INCIDENTS: Incident[] = [
       {
         id: 'learn',
         label: '教材と交換する',
-        hint: '現金の増減なし。「ドルコスト平均法」を1枚獲得し、次の予報が詳しくなる。',
+        hint: '現金の増減なし。「ドルコスト平均法」を1枚獲得し、次の市場予報の精度が上がる。',
         card: 'dollarCost',
         insight: true,
       },

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { GameBoard, GameHUD, GameTools } from '@/components/game/board';
 import { IncidentLog } from '@/components/game/incidents';
+import { publicMarketInfo, FORECAST_CONFIG } from '@/lib/game/forecast';
 import { INCIDENTS } from '@/lib/game/incidents';
 import { Button } from '@/components/ui/button';
 import {
@@ -339,17 +340,6 @@ export default function Home() {
         incidentResult:
           s.phase === 'incidentResult' ? s.incidentHistory.at(-1) : undefined,
         nextLossShield: s.nextLossShield,
-        detailedForecast:
-          s.phase === 'forecast' && s.forecastInsight
-            ? Object.fromEntries(
-                Object.entries(
-                  MARKET_EVENTS.find((e) => e.id === s.eventId)!.returns,
-                ).map(([id, rate]) => [
-                  id,
-                  rate > 0 ? '上向き' : rate < 0 ? '下向き' : '横ばい',
-                ]),
-              )
-            : undefined,
         phase: s.phase,
         year: s.turn,
         asset: s.assetType,
@@ -370,15 +360,7 @@ export default function Home() {
         rewardChoices: s.phase === 'reward' ? s.rewardChoices : undefined,
         shopOffers: s.phase === 'broker' ? s.shopOffers : undefined,
         deck: s.deck,
-        market: ['decision', 'turnResult', 'clear', 'gameOver'].includes(
-          s.phase,
-        )
-          ? s.eventId
-          : undefined,
-        forecast:
-          s.phase === 'forecast'
-            ? MARKET_EVENTS.find((e) => e.id === s.eventId)?.forecast
-            : undefined,
+        ...publicMarketInfo(s),
       };
     };
     const tools: ModelTool[] = [
@@ -396,7 +378,7 @@ export default function Home() {
       {
         name: 'play_kabukura_action',
         description:
-          '画面と同じ操作で進める。select_cardで手札のinstanceId（nullで解除）、rebalance_targetで装備を選択しresolveで進行確定。rewardはcardId（nullでスキップ）。ショップはshop_asset、shop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。',
+          '市場予報を読み、結果を知る前にselect_cardで手札のinstanceId（nullで解除）、rebalance_targetで装備を選択しresolveで戦略確定後に相場を抽選。rewardはcardId（nullでスキップ）。ショップはshop_asset、shop_buy、shop_remove、leave_shop。突発イベントはincident_choiceでchoiceIdを選び、incident_nextで結果から進む。市場ショックのみpanic/hold/buyMore、生活トラブルはpay。',
         inputSchema: {
           type: 'object',
           properties: {
@@ -406,7 +388,6 @@ export default function Home() {
                 'start',
                 'select_asset',
                 'broker',
-                'reveal',
                 'resolve',
                 'incident_choice',
                 'incident_next',
@@ -457,7 +438,6 @@ export default function Home() {
           else if (v.action === 'incident_next')
             action = { type: 'INCIDENT_NEXT' };
           else if (v.action === 'resolve') action = { type: 'RESOLVE' };
-          else if (v.action === 'reveal') action = { type: 'REVEAL' };
           else if (v.action === 'next') action = { type: 'NEXT' };
           else if (
             v.action === 'select_card' &&
@@ -731,8 +711,9 @@ export default function Home() {
           <details className="debug-panel">
             <summary>DEBUG · SEED {s.seed}</summary>
             <p>
-              イベント：{s.eventId} / 前回証券会社から {s.turnsSinceBroker}年 /
-              最大DD {pct(s.maxDrawdown)}
+              確定イベント：{s.eventId ?? '未抽選'} / テスト指定：
+              {s.forcedEventId ?? 'なし'} / 前回証券会社から{' '}
+              {s.turnsSinceBroker}年 / 最大DD {pct(s.maxDrawdown)}
             </p>
             {s.phase === 'forecast' && (
               <div className="debug-buttons">
@@ -783,9 +764,11 @@ export default function Home() {
               </p>
             </li>
             <li>
-              <strong>予報を読み、相場を見る</strong>
+              <strong>予報を読み、先に戦略を決める</strong>
               <p>
-                市場予報は傾向のヒント。相場公開後も騰落率や予想資産は表示されません。実際の騰落率は、進行後のRESULTで初めて分かります。
+                市場予報は今観測できる材料です。同じ予報でも違う相場が起こります。強気・弱気・回復予報は基本
+                {Math.round(FORECAST_CONFIG.directionAccuracy * 100)}
+                %で方向性が当たりますが、具体的な相場名と騰落率は戦略確定後に抽選されます。
               </p>
             </li>
             <li>
@@ -797,13 +780,20 @@ export default function Home() {
             <li>
               <strong>戦略を確定して、結果を見る</strong>
               <p>
-                選んだカードを使うか、カードを使わずに進みます。ドルコスト平均法は現金75%、逆張りは現金50%を追加投資。現金確保は投資額20%を現金化します。カードなしなら現在の配分を維持します。
+                選んだカードを使うか、カードを使わずに進みます。ドルコスト平均法は現金75%、逆張りは現金50%を追加投資。現金確保は投資額20%を現金化します。カードなしなら現在の配分を維持します。損切りは損失−25%・利益+5%が上限。レバレッジは利益も損失も2倍です。
               </p>
             </li>
             <li>
               <strong>年末の突発イベントを乗り越える</strong>
               <p>
-                通常相場の処理後、発生可能な年は30%で突発イベント。連続年には発生せず、20年完走なら最低4回、同じ出来事は一度だけです。市場ショックだけは狼狽売り・ホールド・買い増しから選び、騰落率は選択後に判明します。生活トラブルは現金優先で支払い、不足分を強制売却。日常の選択では現金・カード・次回の詳細予報・次の通常相場の下落半減を得られます。任意の参加費は現金が必要です。継続効果は重複せず、最終年には次の通常相場がありません。
+                通常相場の処理後、発生可能な年は30%で突発イベント。連続年には発生せず、20年完走なら最低4回、同じ出来事は一度だけです。市場ショックだけは狼狽売り・ホールド・買い増しから選び、騰落率は選択後に判明します。生活トラブルは現金優先で支払い、不足分を強制売却。日常の選択では現金・カード・次回の予報精度アップ（
+                {Math.round(FORECAST_CONFIG.directionAccuracy * 100)}%→
+                {Math.round(
+                  (FORECAST_CONFIG.directionAccuracy +
+                    FORECAST_CONFIG.insightBonus) *
+                    100,
+                )}
+                %）・次の通常相場の下落半減を得られます。任意の参加費は現金が必要です。継続効果は重複せず、最終年には次の通常相場がありません。
               </p>
             </li>
             <li>

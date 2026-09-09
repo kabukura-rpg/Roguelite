@@ -74,7 +74,6 @@ export type MarketEvent = {
   category: string;
   weight: number;
   description: string;
-  forecast: [string, string][];
   returns: Record<AssetId, number>;
 };
 const assetIds = Object.keys(ASSETS) as AssetId[];
@@ -85,28 +84,16 @@ const make = (
   weight: number,
   values: number[],
   description: string,
-  forecast: [string, string][],
 ): MarketEvent => ({
   id,
   name,
   category,
   weight,
   description,
-  forecast,
   returns: Object.fromEntries(
     assetIds.map((a, i) => [a, values[i] / 100]),
   ) as Record<AssetId, number>,
 });
-const bull: [string, string][] = [
-  ['景気', '上向き'],
-  ['市場心理', '強気'],
-  ['リスク', '低〜中'],
-];
-const crash: [string, string][] = [
-  ['景気', '急速に悪化'],
-  ['市場心理', '不安定'],
-  ['リスク', '非常に高い'],
-];
 export const MARKET_EVENTS: MarketEvent[] = [
   make(
     'normal_up',
@@ -115,11 +102,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     20,
     [8, 11, 6, 2, 2],
     '市場は穏やかな上昇を続けています。投資家心理も安定しています。',
-    [
-      ['景気', '緩やかに改善'],
-      ['市場心理', '安定'],
-      ['リスク', '低'],
-    ],
   ),
   make(
     'strong_up',
@@ -128,7 +110,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     13,
     [15, 22, 10, 0, 1],
     '企業業績が好調です。市場には楽観ムードが広がっています。',
-    bull,
   ),
   make(
     'bubble',
@@ -137,7 +118,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     7,
     [22, 35, 14, -3, 0],
     '市場が熱狂しています。「まだ上がる」という声があちこちから聞こえます。',
-    bull,
   ),
   make(
     'correction',
@@ -146,11 +126,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     15,
     [-10, -14, -7, 3, 3],
     '利益確定売りが広がっています。市場は一時的な調整局面に入りました。',
-    [
-      ['景気', 'やや悪化'],
-      ['市場心理', '慎重'],
-      ['リスク', '中'],
-    ],
   ),
   make(
     'crash',
@@ -159,7 +134,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     10,
     [-30, -40, -22, 10, 7],
     '株式市場が急落しています。投資家の間に不安が広がっています。',
-    crash,
   ),
   make(
     'severe_crash',
@@ -168,7 +142,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     3,
     [-45, -58, -35, 18, 12],
     '世界市場が混乱しています。歴史に残る規模の下落が発生しました。',
-    crash,
   ),
   make(
     'recovery',
@@ -177,11 +150,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     10,
     [20, 30, 15, -4, 1],
     '市場に買いが戻っています。底打ちを期待する動きが広がっています。',
-    [
-      ['景気', '底打ちの兆し'],
-      ['市場心理', '改善'],
-      ['リスク', '中'],
-    ],
   ),
   make(
     'rate_hike',
@@ -190,11 +158,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     8,
     [-8, -18, -4, 2, -6],
     '中央銀行が政策金利を引き上げました。市場の資金環境が変化しています。',
-    [
-      ['金利', '上昇傾向'],
-      ['景気', '不透明'],
-      ['市場心理', '慎重'],
-    ],
   ),
   make(
     'inflation',
@@ -203,11 +166,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     7,
     [-3, -5, 2, 15, -8],
     '物価上昇が加速しています。市場ではインフレへの警戒が強まっています。',
-    [
-      ['物価', '上昇'],
-      ['金利', '不透明'],
-      ['関心', '実物資産'],
-    ],
   ),
   make(
     'stagnation',
@@ -216,11 +174,6 @@ export const MARKET_EVENTS: MarketEvent[] = [
     7,
     [1, -2, 4, 4, 3],
     '景気は方向感を欠いています。市場も様子見ムードです。',
-    [
-      ['景気', '横ばい'],
-      ['市場心理', '様子見'],
-      ['リスク', '低〜中'],
-    ],
   ),
 ];
 export const DECISIONS = {

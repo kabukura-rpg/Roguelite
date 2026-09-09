@@ -1,3 +1,4 @@
+import { INCIDENTS } from '../lib/game/incidents.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -11,11 +12,17 @@ import {
   cardSummary,
   type CardId,
 } from '../lib/game/cards.ts';
-import { ASSETS, type AssetId, type Decision } from '../lib/game/data.ts';
+import { handleIncident } from './helpers.ts';
+import {
+  MARKET_EVENTS,
+  ASSETS,
+  type AssetId,
+  type Decision,
+} from '../lib/game/data.ts';
 import {
   createGame,
   reducer,
-  previewDecision,
+  applyDecision,
   totalAssets,
   cloneState,
   type State,
@@ -28,7 +35,6 @@ function decisionState(
   let s = reducer(createGame(), { type: 'START', seed: 100, debug: true });
   s = reducer(s, { type: 'SELECT_ASSET', assetId });
   s = reducer(s, { type: 'FORCE_EVENT', eventId });
-  s = reducer(s, { type: 'REVEAL' });
   if (cardId) {
     if (!s.deck.some((c) => c.cardId === cardId))
       addCard(s, cardId, 'reward', 0);
@@ -46,10 +52,15 @@ function settle(
   event = 'crash',
   decision: Decision = 'hold',
 ) {
-  return reducer(decisionState(cardId, asset, event), {
-    type: 'DECIDE',
-    decision,
-  });
+  return settleDecision(decisionState(cardId, asset, event), decision);
+}
+// Fixed-return regression fixture for the existing math helpers. The production
+// reducer has no pre-revealed decision phase; normal flow is tested separately.
+function settleDecision(state: State, decision: Decision) {
+  const s = cloneState(state);
+  const event = MARKET_EVENTS.find((e) => e.id === s.forcedEventId)!;
+  applyDecision(s, decision, event);
+  return s;
 }
 function zones(s: State) {
   const all = [...s.drawPile, ...s.hand, ...s.discardPile];
@@ -64,7 +75,7 @@ function nextDecision(state: State, eventId: string) {
   if (s.phase === 'reward') s = reducer(s, { type: 'REWARD', cardId: null });
   if (s.phase === 'broker') s = reducer(s, { type: 'LEAVE_SHOP' });
   s = reducer(s, { type: 'FORCE_EVENT', eventId });
-  return reducer(s, { type: 'REVEAL' });
+  return s;
 }
 void test('initial ten cards with exact counts; seeded shuffle excludes equipment and basic commands', () => {
   const s = createDeck(12);
@@ -164,14 +175,14 @@ void test('stop loss: NASDAQ severe crash -58% → -25%; mild declines unchanged
   );
 });
 void test('leverage boosts both directions and never creates debt below -100%', () => {
-  assert.equal(totalAssets(settle('leverage', 'nasdaq', 'recovery')), 1432000);
+  assert.equal(totalAssets(settle('leverage', 'nasdaq', 'recovery')), 1480000);
   const s = settle('leverage', 'nasdaq', 'severe_crash');
   assert.equal(s.investedAssets, 0);
   assert.equal(s.cash, 200000);
   assert.equal(s.phase, 'turnResult');
   const zero = decisionState('leverage', 'nasdaq', 'severe_crash');
   zero.cash = 0;
-  const end = reducer(zero, { type: 'DECIDE', decision: 'hold' });
+  const end = settleDecision(zero, 'hold');
   assert.equal(end.phase, 'gameOver');
   assert.equal(totalAssets(end), 0);
   assert.equal(end.hand.length, 0);
@@ -207,19 +218,19 @@ void test('dividend includes current year, expires after third payout, and stack
   assert.equal(s.history[0].strategyDividend, 8000);
   assert.equal(s.dividendTurns, 2);
   s = nextDecision(s, 'strong_up');
-  s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  s = settleDecision(s, 'hold');
   assert.equal(s.dividendTurns, 1);
   assert.equal(s.history[1].strategyDividend, 8000);
   s = nextDecision(s, 'strong_up');
-  s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  s = settleDecision(s, 'hold');
   assert.equal(s.dividendTurns, 0);
   assert.equal(s.history[2].strategyDividend, 8000);
   s = nextDecision(s, 'strong_up');
-  s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  s = settleDecision(s, 'hold');
   assert.equal(s.history[3].strategyDividend, 0);
   let stack = decisionState('dividend', 'gold', 'strong_up');
   stack.dividendTurns = 2;
-  stack = reducer(stack, { type: 'DECIDE', decision: 'hold' });
+  stack = settleDecision(stack, 'hold');
   assert.equal(stack.dividendTurns, 4);
   assert.equal(stack.history[0].strategyDividend, 8000);
 });
@@ -239,7 +250,7 @@ void test('rebalance is staged, charges normal fee at command, and keeps current
   s = reducer(s, { type: 'REBALANCE_TARGET', assetId: 'gold' });
   assert.equal(s.assetType, 'nasdaq');
   assert.equal(s.cash, 200000);
-  const outcome = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  const outcome = settleDecision(s, 'hold');
   assert.equal(outcome.assetType, 'gold');
   assert.equal(outcome.cash, 190000);
   assert.equal(outcome.investedAssets, 880000);
@@ -256,15 +267,15 @@ void test('contrarian arms only on crash+buy, waits through negative returns, tr
   assert.equal(s.contrarianPending, true);
   assert.equal(s.history[0].effectiveReturn, -0.3);
   s = nextDecision(s, 'correction');
-  s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  s = settleDecision(s, 'hold');
   assert.equal(s.contrarianPending, true);
   s = nextDecision(s, 'recovery');
-  s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  s = settleDecision(s, 'hold');
   assert.equal(s.history[2].effectiveReturn, 0.26);
   assert.equal(totalAssets(s), 814420);
   assert.equal(s.contrarianPending, false);
   s = nextDecision(s, 'recovery');
-  s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+  s = settleDecision(s, 'hold');
   assert.equal(s.history[3].effectiveReturn, 0.2);
   assert.equal(
     settle('contrarian', 'sp500', 'crash', 'hold').contrarianPending,
@@ -282,22 +293,27 @@ void test('contrarian is not consumed in its arming turn even if gold gains duri
   assert.equal(s.contrarianPending, true);
   s = decisionState('leverage', 'sp500', 'recovery');
   s.contrarianPending = true;
-  const out = reducer(s, { type: 'DECIDE', decision: 'hold' });
-  assert.ok(Math.abs(out.history[0].effectiveReturn - 0.468) < 1e-12);
+  const out = settleDecision(s, 'hold');
+  assert.ok(Math.abs(out.history[0].effectiveReturn - 0.52) < 1e-12);
   assert.equal(out.contrarianPending, false);
 });
-void test('every card × every command: preview exactly matches settlement, live state unchanged, one card use', () => {
+void test('every card × math command: clone calculation leaves live state unchanged, one card use', () => {
   for (const cardId of Object.keys(CARDS) as CardId[]) {
     for (const decision of ['hold', 'panic', 'buyMore'] as Decision[]) {
       const s = decisionState(cardId, 'nasdaq', 'severe_crash');
       const before = structuredClone(s);
-      const preview = previewDecision(s, decision)!;
+      const preview = cloneState(s);
+      applyDecision(
+        preview,
+        decision,
+        MARKET_EVENTS.find((e) => e.id === s.forcedEventId)!,
+      );
       assert.deepEqual(s, before);
-      const after = reducer(s, { type: 'DECIDE', decision });
-      assert.deepEqual(preview, after.history[0]);
+      const after = settleDecision(s, decision);
+      assert.deepEqual(preview.history[0], after.history[0]);
       assert.equal(cardSummary(after).totalUsed, 1);
       assert.equal(after.hand.length, 0);
-      assert.equal(reducer(after, { type: 'DECIDE', decision }), after);
+      assert.equal(reducer(after, { type: 'RESOLVE' }), after);
       zones(after);
     }
   }
@@ -307,7 +323,7 @@ void test('all three commands work with no hand, no selected card and no cash', 
     const s = decisionState(null);
     for (const c of s.deck) removeCard(s, c.id);
     s.cash = 0;
-    const after = reducer(s, { type: 'DECIDE', decision });
+    const after = settleDecision(s, decision);
     assert.equal(after.history.length, 1);
     assert.equal(after.history[0].cardId, null);
     assert.equal(cardSummary(after).totalUsed, 0);
@@ -317,7 +333,7 @@ void test('all three commands work with no hand, no selected card and no cash', 
 void test('reward at year 3: three distinct choices, reject invalid, acquire once into deck', () => {
   let s = decisionState(null);
   for (let turn = 1; turn <= 3; turn++) {
-    s = reducer(s, { type: 'DECIDE', decision: 'hold' });
+    s = settleDecision(s, 'hold');
     if (turn < 3) s = nextDecision(s, 'normal_up');
   }
   assert.equal(s.phase, 'turnResult');
@@ -440,8 +456,7 @@ void test('100 full runs cover rewards, shopping, removal and card play with con
       assert.ok(++steps < 180);
       zones(s);
       const before = structuredClone(s);
-      if (s.phase === 'forecast') s = reducer(s, { type: 'REVEAL' });
-      else if (s.phase === 'decision') {
+      if (s.phase === 'forecast') {
         if (s.hand.length)
           s = reducer(s, {
             type: 'SELECT_CARD',
@@ -451,12 +466,10 @@ void test('100 full runs cover rewards, shopping, removal and card play with con
           s.deck.find((c) => c.id === s.selectedCardId)?.cardId === 'rebalance'
         )
           s = reducer(s, { type: 'REBALANCE_TARGET', assetId: 'gold' });
-        s = reducer(s, {
-          type: 'DECIDE',
-          decision:
-            seed % 3 === 0 ? 'buyMore' : seed % 3 === 1 ? 'hold' : 'panic',
-        });
+        s = reducer(s, { type: 'RESOLVE' });
       } else if (s.phase === 'turnResult') s = reducer(s, { type: 'NEXT' });
+      else if (s.phase === 'incident' || s.phase === 'incidentResult')
+        s = handleIncident(s);
       else if (s.phase === 'reward')
         s = reducer(s, { type: 'REWARD', cardId: s.rewardChoices[seed % 3] });
       else if (s.phase === 'broker') {
@@ -483,7 +496,10 @@ void test('100 full runs cover rewards, shopping, removal and card play with con
       );
     } else assert.equal(totalAssets(s), 0);
     assert.equal(
-      s.history.length,
+      s.history.length +
+        s.incidentHistory.filter(
+          (h) => INCIDENTS.find((e) => e.id === h.id)?.kind === 'shock',
+        ).length,
       Object.values(s.decisionCounts).reduce((a, b) => a + b, 0),
     );
     assert.ok(cardSummary(s).totalUsed <= s.history.length);

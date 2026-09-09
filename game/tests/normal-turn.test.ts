@@ -13,7 +13,6 @@ function turn(cardId: CardId | null, eventId = 'crash'): State {
   let s = reducer(createGame(), { type: 'START', seed: 123, debug: true });
   s = reducer(s, { type: 'SELECT_ASSET', assetId: 'sp500' });
   s = reducer(s, { type: 'FORCE_EVENT', eventId });
-  s = reducer(s, { type: 'REVEAL' });
   if (cardId) {
     if (!s.deck.some((c) => c.cardId === cardId))
       addCard(s, cardId, 'reward', 0);
@@ -35,7 +34,10 @@ void test('normal turn: card selection leaves balances unchanged until a single 
   assert.equal(result.phase, 'turnResult');
   assert.equal(result.history[0].resolution, 'strategy');
   assert.equal(result.history[0].cardId, 'diversify');
-  assert.equal(totalAssets(result), 832_000);
+  assert.equal(
+    totalAssets(result),
+    200_000 + Math.round(800_000 * (1 + result.history[0].baseReturn * 0.7)),
+  );
   assert.equal(cardSummary(result).totalUsed, 1);
   assert.equal(result.hand.length, 0);
   assert.equal(reducer(result, { type: 'RESOLVE' }), result);
@@ -50,7 +52,10 @@ void test('normal turn: decline or no hand still resolves without a command', ()
       s.hand = [];
     }
     const out = reducer(s, { type: 'RESOLVE' });
-    assert.equal(totalAssets(out), 760_000);
+    assert.equal(
+      totalAssets(out),
+      200_000 + Math.round(800_000 * (1 + out.history[0].baseReturn)),
+    );
     assert.equal(out.history[0].cardId, null);
     assert.equal(cardSummary(out).totalUsed, 0);
   }
@@ -60,7 +65,10 @@ void test('dollar cost invests 75% of cash by itself before the market', () => {
   const out = reducer(turn('dollarCost'), { type: 'RESOLVE' });
   assert.equal(out.history[0].additional, 150_000);
   assert.equal(out.cash, 50_000);
-  assert.equal(out.investedAssets, 665_000);
+  assert.equal(
+    out.investedAssets,
+    Math.round(950_000 * (1 + out.history[0].baseReturn)),
+  );
 });
 
 void test('contrarian invests 50% by itself and arms only on a crash', () => {
@@ -78,7 +86,10 @@ void test('cash reserve transfers 20% before settlement; no additional purchase'
   assert.equal(out.history[0].cashReserved, 160_000);
   assert.equal(out.history[0].additional, 0);
   assert.equal(out.cash, 360_000);
-  assert.equal(out.investedAssets, 448_000);
+  assert.equal(
+    out.investedAssets,
+    Math.round(640_000 * (1 + out.history[0].baseReturn)),
+  );
 });
 
 void test('rebalance charges once on resolve and cannot change balances when staged', () => {
@@ -90,15 +101,20 @@ void test('rebalance charges once on resolve and cannot change balances when sta
   assert.equal(out.assetType, 'gold');
   assert.equal(out.history[0].cardRebalanceFee, 10_000);
   assert.equal(out.cash, 190_000);
-  assert.equal(out.investedAssets, 880_000);
+  assert.equal(
+    out.investedAssets,
+    Math.round(800_000 * (1 + out.history[0].baseReturn)),
+  );
 });
 
-void test('normal resolve is unavailable before market reveal or in other phases', () => {
+void test('normal resolve is unavailable outside the forecast phase', () => {
   const s = turn(null);
   for (const phase of [
     'title',
     'select',
-    'forecast',
+    'turnResult',
+    'incident',
+    'incidentResult',
     'broker',
     'reward',
     'clear',
@@ -116,8 +132,7 @@ void test('100 runs complete through the card-only flow, rewards and shops', () 
     let steps = 0;
     while (!['clear', 'gameOver'].includes(s.phase)) {
       assert.ok(++steps < 120);
-      if (s.phase === 'forecast') s = reducer(s, { type: 'REVEAL' });
-      else if (s.phase === 'decision') {
+      if (s.phase === 'forecast') {
         s = reducer(s, {
           type: 'SELECT_CARD',
           instanceId: seed % 2 ? (s.hand[0] ?? null) : null,

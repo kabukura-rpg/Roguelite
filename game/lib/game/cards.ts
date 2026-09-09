@@ -5,7 +5,8 @@ export const CARD_CONFIG = {
   removalCost: 30_000,
   diversificationFactor: 0.7,
   stopLossFloor: -0.25,
-  leverageFactor: 1.8,
+  stopLossCeiling: 0.05,
+  leverageFactor: 2,
   dividendDuration: 3,
   dividendRate: 0.01,
   cashReserveRatio: 0.2,
@@ -27,9 +28,9 @@ export const CARDS = {
     category: '守備',
     icon: 'scissors',
     color: '#91b9ed',
-    summary: '最大損失 −25%',
+    summary: '損失 −25% / 利益 +5%まで',
     description:
-      'この年の投資先のマイナスリターンを−25%までに制限。現金や手数料は対象外。',
+      'この年の相場による損失は最大−25%、利益も最大+5%に制限。上昇を取り逃す代わりに下落を抑えます。配当・現金・手数料は対象外。',
     price: 60_000,
   },
   leverage: {
@@ -37,9 +38,8 @@ export const CARDS = {
     category: '攻勢',
     icon: 'zap',
     color: '#eda391',
-    summary: '利益・損失 ×1.8',
-    description:
-      'この年の相場リターンを1.8倍。大きな利益にも、大きな損失にも。',
+    summary: '利益・損失 ×2',
+    description: 'この年の相場リターンを2倍。大きな利益にも、大きな損失にも。',
     price: 70_000,
   },
   dividend: {
@@ -58,7 +58,8 @@ export const CARDS = {
     icon: 'wallet',
     color: '#dab77c',
     summary: '投資額20%を現金化',
-    description: '相場リターンの前に、投資資産の20%を現金に移す。',
+    description:
+      '相場リターンの前に、投資資産の20%を現金に移す。下落の影響を減らす一方、上昇時の利益も減ります。',
     price: 40_000,
   },
   dollarCost: {
@@ -68,7 +69,7 @@ export const CARDS = {
     color: '#eda391',
     summary: '現金75%を投入',
     description:
-      'このカードだけで、相場リターンの前に現金の75%を追加投資する。現金がなくても使用できる。',
+      'このカードだけで、相場リターンの前に現金の75%を追加投資する。上昇時の利益も下落時の損失も増えます。現金がなくても使用できます。',
     price: 50_000,
   },
   rebalance: {

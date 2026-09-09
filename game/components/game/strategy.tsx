@@ -158,7 +158,7 @@ export function HandPanel({
         </h3>
         <span>
           {disabled ? (
-            '相場公開後に選択'
+            '予報を待っています'
           ) : (
             <>
               戦略 <b>{selected ? 1 : 0} / 1枚</b>

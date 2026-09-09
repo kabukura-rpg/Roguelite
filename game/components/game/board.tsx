@@ -9,9 +9,6 @@ import {
   Gem,
   Flag,
   CloudFog,
-  CloudLightning,
-  Flame,
-  Wind,
   TrendingUp,
   TrendingDown,
   Landmark,
@@ -19,7 +16,6 @@ import {
   BookOpen,
   History as HistoryIcon,
   ArrowRight,
-  Eye,
   Clock,
   Crosshair,
   Gift,
@@ -42,6 +38,7 @@ import {
   GAME_CONFIG,
   type AssetId,
 } from '@/lib/game/data';
+import { FORECAST_PATTERNS, compareForecast } from '@/lib/game/forecast';
 import { CARDS, CARD_CONFIG, selectedCard } from '@/lib/game/cards';
 import {
   totalAssets,
@@ -171,7 +168,7 @@ function Effects({ state: s }: { state: State }) {
   return (
     <div className="arena-effects">
       {s.nextLossShield && <span>冷静な判断 · 次の通常相場の下落半減</span>}
-      {s.forecastInsight && <span>次の予報を詳しく確認</span>}
+      {s.forecastInsight && <span>情報収集 · 今回の予報精度UP</span>}
       {s.dividendTurns > 0 && (
         <span>
           <Clock size={13} />
@@ -187,102 +184,36 @@ function Effects({ state: s }: { state: State }) {
     </div>
   );
 }
-function Encounter({
-  state: s,
-  commit,
-}: {
-  state: State;
-  commit: (action: Action) => unknown;
-}) {
-  const e = MARKET_EVENTS.find((e) => e.id === s.eventId)!;
-  const revealed = s.phase === 'decision';
-  const risk =
-    e.forecast.find(([label]) => label === 'リスク')?.[1] ?? '変動に注意';
-  const Icon = !revealed
-    ? CloudFog
-    : e.category === '暴落'
-      ? CloudLightning
-      : e.id === 'bubble'
-        ? Flame
-        : e.id === 'rate_hike' || e.id === 'inflation'
-          ? Wind
-          : e.category !== '下落'
-            ? TrendingUp
-            : TrendingDown;
-  const notes = [
-    s.reentry > 0 ? `${yen(s.reentry)}円を自動再投資` : null,
-    s.brokerFee > 0 ? `装備変更 ${yen(s.brokerFee)}円` : null,
-    s.shopSpent > 0 ? `ショップ ${yen(s.shopSpent)}円` : null,
-  ].filter(Boolean);
+function Encounter({ state: s }: { state: State }) {
+  if (!s.forecast) return null;
+  const pattern = FORECAST_PATTERNS[s.forecast.id];
   return (
     <section
-      className={`battle-arena ${!revealed ? 'is-forecast' : 'is-uncertain'}`}
-      aria-label={revealed ? '相場との対峙' : '市場予報'}
+      className="battle-arena is-forecast strategy-forecast"
+      aria-label="市場予報"
     >
       <div className="arena-topline">
-        <span className="arena-tag">
-          {revealed ? `ENCOUNTER · ${e.category}` : 'MARKET FORECAST'}
-        </span>
+        <span className="arena-tag">MARKET FORECAST</span>
         <Effects state={s} />
       </div>
-      <div className="encounter-center">
-        <div className="enemy-sigil" aria-hidden="true">
-          <Icon strokeWidth={1} />
-        </div>
-        <div className="enemy-copy">
-          <span className="enemy-overline">
-            {revealed ? '立ちはだかる相場' : '次の相場の気配'}
-          </span>
-          <h2>{revealed ? e.name : 'まだ見ぬ市場'}</h2>
-          {revealed ? (
-            <p>{e.description}</p>
-          ) : (
-            <div className="forecast-signals">
-              {e.forecast.map(([k, v]) => (
-                <div key={k}>
-                  <span>{k}</span>
-                  <strong>{v}</strong>
-                </div>
-              ))}
-              {s.forecastInsight &&
-                Object.values(ASSETS).map((asset) => (
-                  <div key={asset.id}>
-                    <span>{asset.name}</span>
-                    <strong>
-                      {e.returns[asset.id] > 0
-                        ? '上向きの見通し'
-                        : e.returns[asset.id] < 0
-                          ? '下向きの見通し'
-                          : '横ばいの見通し'}
-                    </strong>
-                  </div>
-                ))}
+      <div className="forecast-center">
+        <CloudFog
+          className="forecast-icon"
+          strokeWidth={1}
+          aria-hidden="true"
+        />
+        <h2>{pattern.name}</h2>
+        <div className="forecast-observations">
+          {pattern.signals.map(([label, value]) => (
+            <div key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
             </div>
-          )}
+          ))}
         </div>
-        {revealed ? (
-          <div className="enemy-intent uncertain-intent">
-            <span>市場リスク</span>
-            <strong>{risk}</strong>
-            <small>騰落率は結果で判明</small>
-          </div>
-        ) : (
-          <Button
-            className="primary reveal-button"
-            onClick={() => commit({ type: 'REVEAL' })}
-          >
-            <Eye /> 相場を公開 <ArrowRight />
-          </Button>
-        )}
       </div>
       <div className="arena-bottomline">
-        {revealed ? (
-          <span>戦略を0〜1枚選択。結果を見届けよう。</span>
-        ) : notes.length ? (
-          <span>{notes.join(' / ')}</span>
-        ) : (
-          <span>予報を読んだら、相場を公開して戦略を選ぼう。</span>
-        )}
+        <span>予報は手がかり。相場は戦略を決めたあとに判明します。</span>
       </div>
     </section>
   );
@@ -294,7 +225,7 @@ function StrategyCommit({
   state: State;
   commit: (action: Action) => unknown;
 }) {
-  const ready = s.phase === 'decision';
+  const ready = s.phase === 'forecast';
   const selected = selectedCard(s);
   return (
     <section className="strategy-commit" aria-label="戦略を確定">
@@ -312,11 +243,7 @@ function StrategyCommit({
         disabled={!ready}
         onClick={() => commit({ type: 'RESOLVE' })}
       >
-        {ready
-          ? selected
-            ? 'カードを使う'
-            : 'このまま進む'
-          : '相場公開を待つ'}{' '}
+        {ready ? (selected ? 'この戦略で進む' : 'このまま進む') : '予報を待つ'}{' '}
         <ArrowRight />
       </Button>
       <small>確定するまで選び直せます</small>
@@ -338,8 +265,24 @@ function YearResult({
   return (
     <section className="year-result-board">
       <span className="eyebrow gold">
-        RESULT · YEAR {String(s.turn).padStart(2, '0')}
+        MARKET RESULT · YEAR {String(s.turn).padStart(2, '0')}
       </span>
+      {h.forecast && (
+        <div className="result-forecast-comparison">
+          <span>
+            予報 · {FORECAST_PATTERNS[h.forecast.id].name}
+            {h.forecast.enhanced ? ' / 精度UP' : ''}
+          </span>
+          <p>
+            {FORECAST_PATTERNS[h.forecast.id].signals
+              .slice(0, 2)
+              .map(([label, value]) => `${label}：${value}`)
+              .join(' / ')}
+          </p>
+          <ArrowRight size={14} aria-hidden="true" />
+          <strong>{compareForecast(h.forecast, h.marketEvent).message}</strong>
+        </div>
+      )}
       <div className={`result-insignia ${positive ? 'positive' : 'negative'}`}>
         {positive ? <TrendingUp /> : <TrendingDown />}
       </div>
@@ -391,7 +334,7 @@ function YearResult({
           <Info /> 計算の詳細
         </Button>
         <Button className="primary" onClick={() => commit({ type: 'NEXT' })}>
-          年末の出来事を確認
+          {totalAssets(s) <= 0 ? '最終結果へ' : '年末の出来事を確認'}
           <ArrowRight />
         </Button>
       </div>
@@ -599,14 +542,14 @@ export function GameBoard({
       {(state.phase === 'incident' || state.phase === 'incidentResult') && (
         <IncidentBoard state={state} commit={commit} />
       )}
-      {(state.phase === 'forecast' || state.phase === 'decision') && (
+      {state.phase === 'forecast' && (
         <div className="battle-board">
-          <Encounter state={state} commit={commit} />
+          <Encounter state={state} />
           <div className="battle-dock">
             <HandPanel
               state={state}
               commit={commit}
-              disabled={state.phase !== 'decision'}
+              disabled={state.phase !== 'forecast'}
               compact
             />
             <StrategyCommit state={state} commit={commit} />

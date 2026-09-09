@@ -1,3 +1,4 @@
+import { generateForecast, FORECAST_CONFIG } from '../lib/game/forecast.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -162,9 +163,16 @@ void test('temporary protection and forecast insight are consumed by exactly the
     type: 'INCIDENT_CHOICE',
     choiceId: 'rest',
   });
-  s = { ...s, phase: 'decision', eventId: 'crash', forecastInsight: true };
+  s = {
+    ...s,
+    phase: 'forecast',
+    forecast: generateForecast(0.4, [], FORECAST_CONFIG.insightBonus),
+    debug: true,
+    forcedEventId: 'crash',
+    forecastInsight: true,
+  };
   const out = reducer(s, { type: 'RESOLVE' });
-  assert.equal(out.history[0].effectiveReturn, -0.15);
+  assert.equal(out.history[0].effectiveReturn, out.history[0].baseReturn * 0.5);
   assert.equal(out.nextLossShield, false);
   assert.equal(out.forecastInsight, false);
 });
@@ -184,8 +192,10 @@ void test('year 3 rewards wait for the incident, and year 20 waits for its outco
 void test('asset chart includes both normal settlement and the later incident', () => {
   const s = {
     ...createGame(),
-    phase: 'decision' as const,
-    eventId: 'normal_up',
+    phase: 'forecast' as const,
+    forecast: generateForecast(0),
+    debug: true,
+    forcedEventId: 'normal_up',
   };
   let out = reducer(s, { type: 'RESOLVE' });
   out = { ...out, phase: 'incident', currentIncident: 'income' };
@@ -197,7 +207,13 @@ void test('asset chart includes both normal settlement and the later incident', 
 });
 void test('normal year 20 cannot skip the guaranteed final incident or clear early', () => {
   let s = reducer(
-    { ...createGame(), phase: 'decision', eventId: 'normal_up' },
+    {
+      ...createGame(),
+      phase: 'forecast',
+      forecast: generateForecast(0),
+      debug: true,
+      forcedEventId: 'normal_up',
+    },
     { type: 'RESOLVE' },
   );
   const first = s.history[0];
@@ -207,7 +223,7 @@ void test('normal year 20 cannot skip the guaranteed final incident or clear ear
     year: i + 1,
   }));
   s.turn = 20;
-  s.phase = 'decision';
+  s.phase = 'forecast';
   s.incidentHistory = ['injury', 'appliance', 'repair'].map((id, i) =>
     emptyRecord(id, 13 + i * 2),
   );

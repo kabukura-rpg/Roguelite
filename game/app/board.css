@@ -2536,3 +2536,173 @@ body:has(.game-shell) {
     font-size: 14px;
   }
 }
+
+/* Commit the strategy on observations; actual market information lives in RESULT. */
+.strategy-forecast .forecast-center {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  text-align: center;
+}
+.forecast-icon {
+  width: 44px;
+  height: 44px;
+  color: #cbb887;
+}
+.forecast-center h2 {
+  font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 500;
+  color: #e2d2b0;
+}
+.forecast-observations {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 24px;
+  width: min(100%, 760px);
+}
+.forecast-observations > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.forecast-observations span {
+  font-size: 12px;
+  color: #94a2b5;
+}
+.forecast-observations strong {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.result-forecast-comparison {
+  margin: 12px 0 0;
+  max-width: 600px;
+  color: #9dabbd;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.result-forecast-comparison > span {
+  color: #cbb887;
+}
+.result-forecast-comparison p {
+  margin: 2px 0;
+  text-wrap: balance;
+}
+.result-forecast-comparison > svg {
+  display: block;
+  margin: 4px auto;
+  transform: rotate(90deg);
+}
+.result-forecast-comparison strong {
+  display: block;
+  color: #dbe2ea;
+  font-size: 14px;
+  font-weight: 400;
+  text-wrap: balance;
+}
+.year-result-board:has(.result-forecast-comparison) .result-insignia {
+  width: 42px;
+  height: 42px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+.year-result-board:has(.result-forecast-comparison) .result-insignia svg {
+  width: 24px;
+  height: 24px;
+}
+.year-result-board:has(.result-forecast-comparison) h2 {
+  margin: 8px 0;
+}
+.year-result-board:has(.result-forecast-comparison) .resolved-delta {
+  margin-top: 10px;
+}
+@media (max-width: 900px) {
+  .forecast-observations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 480px;
+    gap: 10px 20px;
+  }
+}
+@media (max-height: 820px) {
+  .strategy-forecast .forecast-center {
+    gap: 6px;
+    padding: 6px 0;
+  }
+  .forecast-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .forecast-observations {
+    gap: 6px 16px;
+  }
+  .forecast-observations > div {
+    gap: 2px;
+  }
+  .result-forecast-comparison {
+    margin-top: 6px;
+  }
+  .year-result-board:has(.result-forecast-comparison) .resolved-balances {
+    margin: 8px 0;
+  }
+}
+@media (max-width: 680px) {
+  .forecast-observations strong {
+    font-size: 13px;
+  }
+  .forecast-observations span {
+    font-size: 11px;
+  }
+  .strategy-forecast .arena-bottomline {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .result-forecast-comparison {
+    font-size: 11px;
+  }
+  .result-forecast-comparison strong {
+    font-size: 12px;
+  }
+  .year-result-board:has(.result-forecast-comparison) .resolved-rate {
+    justify-content: center;
+    gap: 4px;
+  }
+}
+@media (max-width: 680px) and (max-height: 720px) {
+  .forecast-icon {
+    display: none;
+  }
+  .forecast-center h2 {
+    font-size: 17px;
+  }
+  .forecast-observations {
+    gap: 4px 12px;
+  }
+  .forecast-observations > div {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 5px;
+    text-align: left;
+  }
+  .forecast-observations span {
+    flex-shrink: 0;
+  }
+  .forecast-observations strong {
+    font-size: 12px;
+  }
+  .year-result-board:has(.result-forecast-comparison) .result-insignia {
+    display: none;
+  }
+  .year-result-board:has(.result-forecast-comparison) .resolved-delta {
+    font-size: 28px;
+    margin: 6px 0;
+  }
+  .year-result-board:has(.result-forecast-comparison) .resolved-actions {
+    margin-top: 4px;
+  }
+}

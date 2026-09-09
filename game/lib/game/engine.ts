@@ -1,4 +1,12 @@
 import {
+  generateForecast,
+  selectActualMarketEvent,
+  calculateMarketReturn,
+  FORECAST_CONFIG,
+  type Forecast,
+} from './forecast.ts';
+export { getAdjustedEventWeights } from './forecast.ts';
+import {
   INCIDENTS,
   createIncidents,
   drawIncident,
@@ -32,7 +40,6 @@ export type Phase =
   | 'select'
   | 'broker'
   | 'forecast'
-  | 'decision'
   | 'turnResult'
   | 'incident'
   | 'incidentResult'
@@ -41,6 +48,7 @@ export type Phase =
   | 'gameOver';
 export type History = {
   resolution: 'strategy' | 'event';
+  forecast: Forecast | null;
   turn: number;
   year: number;
   assetType: AssetId;
@@ -88,6 +96,10 @@ export type State = DeckState &
     seed: number;
     rng: number;
     eventId: string | null;
+    forecast: Forecast | null;
+    forecastRng: number;
+    marketRng: number;
+    forcedEventId: string | null;
     reentry: number;
     brokerFee: number;
     brokerVisits: number[];
@@ -99,7 +111,6 @@ export type Action =
   | { type: 'START'; seed: number; debug?: boolean }
   | { type: 'SELECT_ASSET'; assetId: AssetId }
   | { type: 'BROKER'; assetId: AssetId }
-  | { type: 'REVEAL' }
   | { type: 'SELECT_CARD'; instanceId: string | null }
   | { type: 'REBALANCE_TARGET'; assetId: AssetId }
   | { type: 'REWARD'; cardId: CardId | null }
@@ -107,7 +118,6 @@ export type Action =
   | { type: 'SHOP_BUY'; offerId: string }
   | { type: 'SHOP_REMOVE'; instanceId: string }
   | { type: 'LEAVE_SHOP' }
-  | { type: 'DECIDE'; decision: Decision }
   | { type: 'RESOLVE' }
   | { type: 'INCIDENT_CHOICE'; choiceId: string }
   | { type: 'INCIDENT_NEXT' }
@@ -142,6 +152,10 @@ export function createGame(seed = 1, debug = false): State {
     seed: seed >>> 0,
     rng: seed >>> 0,
     eventId: null,
+    forecast: null,
+    forecastRng: (seed ^ 0x9137aab1) >>> 0,
+    marketRng: (seed ^ 0x52e9143f) >>> 0,
+    forcedEventId: null,
     reentry: 0,
     brokerFee: 0,
     brokerVisits: [],
@@ -155,36 +169,12 @@ export function random(s: State) {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
-export function getAdjustedEventWeights(
-  history: Pick<History, 'marketEvent'>[],
-) {
-  const last = history.at(-1)?.marketEvent;
-  const before = history.at(-2)?.marketEvent;
-  return MARKET_EVENTS.map((event) => {
-    let weight = event.weight;
-    if (last === 'crash' || last === 'severe_crash') {
-      if (event.id === 'recovery') weight *= 2.5;
-      if (event.id === 'bubble') weight *= 0.3;
-      if (event.id === 'strong_up') weight *= 1.3;
-    }
-    if (last === 'bubble') {
-      if (event.id === 'correction') weight *= 1.5;
-      if (event.id === 'crash') weight *= 1.8;
-      if (event.id === 'severe_crash') weight *= 1.5;
-    }
-    if (last === 'strong_up' && event.id === 'bubble') weight *= 1.4;
-    if (event.id === last) weight *= before === last ? 0 : 0.35;
-    return { id: event.id, weight };
-  });
-}
-export function selectMarketEvent(s: State) {
-  const weights = getAdjustedEventWeights(s.history);
-  let roll = random(s) * weights.reduce((n, e) => n + e.weight, 0);
-  for (const e of weights) {
-    roll -= e.weight;
-    if (roll < 0) return e.id;
-  }
-  return weights.filter((e) => e.weight > 0).at(-1)!.id;
+function marketRandom(s: State, stream: 'forecastRng' | 'marketRng') {
+  s[stream] = (s[stream] + 0x6d2b79f5) >>> 0;
+  let t = s[stream];
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 export function updateDrawdown(s: State) {
   const total = totalAssets(s);
@@ -206,7 +196,13 @@ export function shouldShowBroker(turn: number, gap: number, roll: number) {
   return turn > 2 && gap >= 3 && (gap >= 5 || roll < (gap === 3 ? 0.3 : 0.6));
 }
 export function showForecast(s: State) {
-  s.eventId = selectMarketEvent(s);
+  s.eventId = null;
+  s.forcedEventId = null;
+  s.forecast = generateForecast(
+    marketRandom(s, 'forecastRng'),
+    s.history,
+    s.forecastInsight ? FORECAST_CONFIG.insightBonus : 0,
+  );
   s.phase = 'forecast';
 }
 export function checkGameOver(s: State) {
@@ -220,6 +216,9 @@ export function startTurn(s: State) {
     s.phase = 'gameOver';
     return;
   }
+  s.eventId = null;
+  s.forecast = null;
+  s.forcedEventId = null;
   s.brokerFee = 0;
   s.shopSpent = 0;
   s.rebalanceTarget = null;
@@ -301,10 +300,12 @@ export function adjustedReturn(
 ) {
   let rate = base;
   if (cardId === 'diversify' && rate < 0) rate *= K.diversificationFactor;
-  if (cardId === 'stopLoss') rate = Math.max(K.stopLossFloor, rate);
+
   if (cardId === 'leverage') rate *= K.leverageFactor;
   if (contrarian && base > 0) rate *= K.contrarianFactor;
-  return rate;
+  if (cardId === 'stopLoss')
+    rate = Math.min(K.stopLossCeiling, Math.max(K.stopLossFloor, rate));
+  return Math.max(-1, rate);
 }
 export function applyDecision(
   s: State,
@@ -373,6 +374,7 @@ export function applyDecision(
   if (event.id === 'severe_crash') s.severeCrashCount++;
   s.history.push({
     resolution,
+    forecast: s.forecast ? { ...s.forecast } : null,
     turn: s.turn,
     year: s.turn,
     assetType: s.assetType,
@@ -425,14 +427,6 @@ export function cloneState(state: State): State {
     rewardChoices: [...state.rewardChoices],
     shopOffers: state.shopOffers.map((o) => ({ ...o })),
   };
-}
-// Preview shares settlement logic and never changes the live state or RNG streams.
-export function previewDecision(state: State, decision: Decision) {
-  const event = MARKET_EVENTS.find((e) => e.id === state.eventId);
-  if (state.phase !== 'decision' || !event) return null;
-  const preview = cloneState(state);
-  applyDecision(preview, decision, event);
-  return preview.history.at(-1)!;
 }
 export function assetHistoryPoints(s: State) {
   const points = [
@@ -641,14 +635,14 @@ export function reducer(state: State, action: Action): State {
       return state;
     s.shopSpent += payCost(s, K.removalCost);
     removeCard(s, action.instanceId);
-  } else if (action.type === 'SELECT_CARD' && s.phase === 'decision') {
+  } else if (action.type === 'SELECT_CARD' && s.phase === 'forecast') {
     if (action.instanceId !== null && !s.hand.includes(action.instanceId))
       return state;
     s.selectedCardId = action.instanceId;
     s.rebalanceTarget = null;
   } else if (
     action.type === 'REBALANCE_TARGET' &&
-    s.phase === 'decision' &&
+    s.phase === 'forecast' &&
     selectedCard(s)?.cardId === 'rebalance' &&
     Object.hasOwn(ASSETS, action.assetId)
   )
@@ -661,28 +655,35 @@ export function reducer(state: State, action: Action): State {
     s.rewardChoices = [];
     s.turn++;
     startTurn(s);
-  } else if (action.type === 'REVEAL' && s.phase === 'forecast')
-    s.phase = 'decision';
-  else if (action.type === 'RESOLVE' && s.phase === 'decision') {
-    const event = MARKET_EVENTS.find((e) => e.id === s.eventId);
+  } else if (
+    action.type === 'RESOLVE' &&
+    s.phase === 'forecast' &&
+    s.forecast
+  ) {
+    const drawnId = selectActualMarketEvent(
+      s.forecast,
+      marketRandom(s, 'marketRng'),
+      s.history,
+    );
+    s.eventId = s.debug && s.forcedEventId ? s.forcedEventId : drawnId;
+    const definition = MARKET_EVENTS.find((e) => e.id === s.eventId)!;
+    const event = {
+      ...definition,
+      returns: calculateMarketReturn(definition, marketRandom(s, 'marketRng')),
+    };
+    s.forcedEventId = null;
     const card = selectedCard(s)?.cardId;
-    // Investment actions belong to the strategy itself on normal turns.
     const decision =
       card === 'dollarCost' || card === 'contrarian' ? 'buyMore' : 'hold';
-    if (event) {
-      applyDecision(s, decision, event, 'strategy');
-      // The final year's incident must resolve before ranking the run.
-      if (checkGameClear(s)) s.phase = 'turnResult';
-    }
-  } else if (
-    action.type === 'DECIDE' &&
-    s.phase === 'decision' &&
-    ['panic', 'hold', 'buyMore'].includes(action.decision)
-  ) {
-    const event = MARKET_EVENTS.find((e) => e.id === s.eventId);
-    if (event) applyDecision(s, action.decision, event);
+    applyDecision(s, decision, event, 'strategy');
+    // Always show this committed outcome, including a bankruptcy or the final year.
+    s.phase = 'turnResult';
   } else if (action.type === 'NEXT' && s.phase === 'turnResult') {
-    if (s.history.at(-1)?.resolution === 'strategy' && drawIncident(s, s.turn))
+    if (
+      !checkGameOver(s) &&
+      s.history.at(-1)?.resolution === 'strategy' &&
+      drawIncident(s, s.turn)
+    )
       s.phase = 'incident';
     else finishYear(s);
   } else if (action.type === 'INCIDENT_CHOICE' && s.phase === 'incident') {
@@ -695,9 +696,9 @@ export function reducer(state: State, action: Action): State {
     s.phase === 'forecast' &&
     MARKET_EVENTS.some((e) => e.id === action.eventId)
   )
-    s.eventId = action.eventId;
+    s.forcedEventId = action.eventId;
   else return state;
-  if (checkGameOver(s) && s.phase !== 'incidentResult') {
+  if (checkGameOver(s) && !['incidentResult', 'turnResult'].includes(s.phase)) {
     s.phase = 'gameOver';
     discardHand(s);
     s.rebalanceTarget = null;
